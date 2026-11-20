@@ -1,0 +1,291 @@
+// BO Spectrum: passes the audio through unchanged and feeds a copy to Bitwig's own spectrum
+// analyser component, which Master Bo reads (its spectrum data, linear FFT bins) to draw its
+// 31-band spectrum; two more analysers get mid and side for its M/S mode.
+//
+// Its own panel: the same 31 third-octave bands (20 Hz .. 20 kHz, ISO centres 1000 * 10^((b - 17) / 10)),
+// here from a filter bank: one band-pass per band and channel (RBJ, Q 4.32 = a third of an octave),
+// its mean square over about 60 ms, in dB, falling 24 dB/s at most (as Master Bo's bars); weighted as
+// Master Bo reads its FFT: Bars as its 1/3 Oct bars, Plot as its curve (see design()).
+//   L/R (mode 0): L and R through the bank, their powers added (a full-scale sine on both = 0 dB)
+//   M/S (mode 1): mid (L + R) / 2 and side (L - R) / 2 through the bank, each 10 log10(2 ms)
+//                 (full-scale mono = 0 dB on mid)
+// "Display" off: the filter bank stops (the analysers for Master Bo go on).
+// Peak hold (the Hold button, on the stereo or mid level): each band's highest level, kept for the
+// hold time (1, 3, 10 s or for ever), then falling 12 dB/s.
+// The panel's four drawings get 12 values each (sp0..2, sp3..5, sp6..8, sp9..11): the band before the
+// drawing's first, its own bands (8, the last 7), the band after it, a spare, the state: -1 off, else the
+// slope (0, 3, 4.5) + 10 in M/S + 20 as a curve (Plot). Each band's value packs three levels,
+// 65536 * a + 256 * b + c, each round(-dB * 2) (0 .. 255, 0.5 dB steps down to -127.5; 255 = none):
+// a the stereo or mid level, b the side (none in Stereo), c the peak hold (none when Hold is off).
+struct bo_spectrum
+{
+    audio_inport<f32<2>> in;
+    audio_outport<f32<2>> out;
+    audio_outport<f32<2>> ana;
+    audio_outport<f32<2>> ana_m;   // mid (L + R) / 2, on both channels
+    audio_outport<f32<2>> ana_s;   // side (L - R) / 2, on both channels
+    audio_outport<f32<4>> sp0;
+    audio_outport<f32<4>> sp1;
+    audio_outport<f32<4>> sp2;
+    audio_outport<f32<4>> sp3;
+    audio_outport<f32<4>> sp4;
+    audio_outport<f32<4>> sp5;
+    audio_outport<f32<4>> sp6;
+    audio_outport<f32<4>> sp7;
+    audio_outport<f32<4>> sp8;
+    audio_outport<f32<4>> sp9;
+    audio_outport<f32<4>> sp10;
+    audio_outport<f32<4>> sp11;
+    value_inport<bool> show;
+    event_inport<void> reset_btn   // a click on the panel's dB or frequency scale: levels and holds start again
+    {
+        for (i32 b = 0; (b < 31); ++b)
+        {
+            lev[b] = -200.0;
+            levs[b] = -200.0;
+            hv[b] = -200.0;
+            hn[b] = 0;
+            pk[b] = 16777215.0;
+        }
+    }
+    value_inport<i32> slope;
+    value_inport<i32> mode;
+    value_inport<i32> view;
+    value_inport<bool> hold;
+    value_inport<i32> hold_time;
+
+    f64[31] b0;
+    f64[31] a1;
+    f64[31] a2;
+    f64[31] zl1;
+    f64[31] zl2;
+    f64[31] zr1;
+    f64[31] zr2;
+    f64[31] msl;
+    f64[31] msr;
+    f32[31] lev;
+    f32[31] levs;
+    f32[31] pk;
+    f32[31] off_bars;
+    f32[31] off_plot;
+    f32[31] hv;
+    i32[31] hn;
+    f32 fall2 = 0.0;
+    f64 rate64 = 48000.0;
+    f64 avg = 0.0;
+    f32 fall = 0.0;
+    i32 count = 0;
+    bool inited = false;
+
+    void design()
+    {
+        f64 rate = cast(EC.samplerate, f64);
+        f64 q = 4.318473;
+        for (i32 b = 0; (b < 31); ++b)
+        {
+            f64 fc = 1000.0 * exp(cast(b - 17, f64) * 0.230258509);   // 10^((b - 17) / 10)
+            f64 w = 6.283185307179586 * fc / rate;
+            if (w > 3.1)
+                w = 3.1;
+            f64 al = sin(w) / (2.0 * q);
+            f64 n = 1.0 + al;
+            b0[b] = al / n;
+            a1[b] = -2.0 * cos(w) / n;
+            a2[b] = (1.0 - al) / n;
+            zl1[b] = 0.0;
+            zl2[b] = 0.0;
+            zr1[b] = 0.0;
+            zr2[b] = 0.0;
+            msl[b] = 0.0;
+            msr[b] = 0.0;
+            lev[b] = -200.0;
+            levs[b] = -200.0;
+            pk[b] = 16777215.0;   // none, none, none
+            // as Master Bo reads its FFT: Bars (its 1/3 Oct) = the band's power - 10 log10(fc / 1 kHz);
+            // Plot = the power per bin of the analyser's 8192-point FFT: the band's power
+            // + 10 log10(bin width / band width), band width = 0.2316 fc
+            off_bars[b] = cast(-(b - 17), f32);
+            off_plot[b] = cast(10.0 * log10(rate / 8192.0 / (0.2316 * fc)), f32);
+            hv[b] = -200.0;
+            hn[b] = 0;
+        }
+        avg = 1.0 - exp(-1.0 / (0.06 * rate));
+        fall = cast(24.0 * 64.0 / rate, f32);
+        fall2 = cast(12.0 * 64.0 / rate, f32);
+        rate64 = rate;
+    }
+
+    void bank(f64 l, f64 r)
+    {
+        for (i32 b = 0; (b < 31); ++b)
+        {
+            f64 yl = b0[b] * l + zl1[b];
+            zl1[b] = zl2[b] - a1[b] * yl;
+            zl2[b] = -b0[b] * l - a2[b] * yl;
+            f64 yr = b0[b] * r + zr1[b];
+            zr1[b] = zr2[b] - a1[b] * yr;
+            zr2[b] = -b0[b] * r - a2[b] * yr;
+            msl[b] = msl[b] + avg * (yl * yl - msl[b]);
+            msr[b] = msr[b] + avg * (yr * yr - msr[b]);
+        }
+    }
+
+    f32 todb(f64 p)
+    {
+        f32 d = -200.0;
+        if (p > 1e-20)
+            d = cast(10.0 * log10(p), f32);
+        return d;
+    }
+
+    f32 q(f32 d)
+    {
+        f32 v = floor(-d * 2.0 + 0.5);
+        if (v < 0.0)
+            v = 0.0;
+        if (v > 255.0)
+            v = 255.0;
+        return v;
+    }
+
+    void levels(bool ms, bool held, i32 hold_n, bool plot)
+    {
+        for (i32 b = 0; (b < 31); ++b)
+        {
+            f32 d = 0.0;
+            f32 e = -200.0;
+            if (ms)
+            {
+                d = todb(2.0 * msl[b]);
+                e = todb(2.0 * msr[b]);
+            }
+            else
+                d = todb(msl[b] + msr[b]);
+            f32 o = off_bars[b];
+            if (plot)
+                o = off_plot[b];
+            d = d + o;
+            e = e + o;
+            lev[b] = fmax(d, lev[b] - fall);
+            levs[b] = fmax(e, levs[b] - fall);
+            f32 c = 255.0;
+            if (held)
+            {
+                if (lev[b] >= hv[b])
+                {
+                    hv[b] = lev[b];
+                    hn[b] = 0;
+                }
+                else
+                {
+                    if (hold_n > 0 && hn[b] < hold_n)
+                        hn[b] = hn[b] + 64;
+                    if (hold_n > 0 && hn[b] >= hold_n)
+                        hv[b] = fmax(lev[b], hv[b] - fall2);
+                }
+                c = q(hv[b]);
+            }
+            else
+                hv[b] = -200.0;
+            pk[b] = 65536.0 * q(lev[b]) + 256.0 * q(levs[b]) + c;
+        }
+    }
+
+    process
+    {
+        f32<2> x = in;
+        out[0] = x[0];
+        out[1] = x[1];
+        ana[0] = x[0];
+        ana[1] = x[1];
+        f32 m = 0.5 * (x[0] + x[1]);
+        f32 sd = 0.5 * (x[0] - x[1]);
+        ana_m[0] = m;
+        ana_m[1] = m;
+        ana_s[0] = sd;
+        ana_s[1] = sd;
+        if (!inited)
+        {
+            inited = true;
+            design();
+        }
+        f32 sl = -1.0;
+        if (show)
+        {
+            if (mode == 1)
+                bank(cast(m, f64), cast(sd, f64));
+            else
+                bank(cast(x[0], f64), cast(x[1], f64));
+            count = count + 1;
+            if (count >= 64)
+            {
+                count = 0;
+                i32 hold_n = 0;   // samples to hold (0: for ever)
+                if (hold_time == 0)
+                    hold_n = cast(rate64, i32);
+                if (hold_time == 1)
+                    hold_n = cast(3.0 * rate64, i32);
+                if (hold_time == 2)
+                    hold_n = cast(10.0 * rate64, i32);
+                levels(mode == 1, hold, hold_n, view == 1);
+            }
+            sl = 0.0;
+            if (slope == 1)
+                sl = 3.0;
+            if (slope == 2)
+                sl = 4.5;
+            if (mode == 1)
+                sl = sl + 10.0;
+            if (view == 1)
+                sl = sl + 20.0;
+        }
+        sp0[0] = 16777215.0;
+        sp0[1] = pk[0];
+        sp0[2] = pk[1];
+        sp0[3] = pk[2];
+        sp1[0] = pk[3];
+        sp1[1] = pk[4];
+        sp1[2] = pk[5];
+        sp1[3] = pk[6];
+        sp2[0] = pk[7];
+        sp2[1] = pk[8];
+        sp2[2] = 16777215.0;
+        sp2[3] = sl;
+        sp3[0] = pk[7];
+        sp3[1] = pk[8];
+        sp3[2] = pk[9];
+        sp3[3] = pk[10];
+        sp4[0] = pk[11];
+        sp4[1] = pk[12];
+        sp4[2] = pk[13];
+        sp4[3] = pk[14];
+        sp5[0] = pk[15];
+        sp5[1] = pk[16];
+        sp5[2] = 16777215.0;
+        sp5[3] = sl;
+        sp6[0] = pk[15];
+        sp6[1] = pk[16];
+        sp6[2] = pk[17];
+        sp6[3] = pk[18];
+        sp7[0] = pk[19];
+        sp7[1] = pk[20];
+        sp7[2] = pk[21];
+        sp7[3] = pk[22];
+        sp8[0] = pk[23];
+        sp8[1] = pk[24];
+        sp8[2] = 16777215.0;
+        sp8[3] = sl;
+        sp9[0] = pk[23];
+        sp9[1] = pk[24];
+        sp9[2] = pk[25];
+        sp9[3] = pk[26];
+        sp10[0] = pk[27];
+        sp10[1] = pk[28];
+        sp10[2] = pk[29];
+        sp10[3] = pk[30];
+        sp11[0] = 16777215.0;
+        sp11[1] = 16777215.0;
+        sp11[2] = 16777215.0;
+        sp11[3] = sl;
+    }
+}

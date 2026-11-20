@@ -1,0 +1,397 @@
+// BO LUFS: loudness and true-peak meter (ITU-R BS.1770-4 / EBU R128, Tech 3341 / 3342).
+// Audio passes through untouched; the device only measures.
+//
+//   K-weighting   two biquads per channel (shelf + RLB high-pass), coefficients derived for the
+//                 current sample rate from the analog prototypes (exact BS.1770 values at 48 kHz).
+//   blocks        the K-weighted energy (L^2 + R^2) is summed per 100 ms block (f64); a ring of
+//                 the last 30 block sums gives momentary (last 4 = 400 ms) and short-term (all
+//                 30 = 3 s). Values update every 100 ms (10 Hz).
+//   integrated    every 400 ms momentary block above -70 LUFS goes into a histogram of 0.1 LU
+//                 bins (-70 .. +10 LUFS) holding the block count and the exact energy sum per bin.
+//                 Relative gate = mean energy of all blocks - 10 LU; integrated = mean energy of
+//                 the bins above the gate. Fixed memory, any programme length.
+//   LRA           EBU Tech 3342: short-term values (once 3 s are filled) above -70 LUFS into a
+//                 second histogram; relative gate -20 LU; LRA = P95 - P10.
+//   true peak     4x polyphase interpolation, 48 taps (12 per phase, Kaiser-windowed sinc),
+//                 max |x| over all phases and the sample itself. Error on band-limited test
+//                 signals: +0.04 / -0.23 dB at 44.1-96 kHz (BS.1770 tolerance +0.2 / -0.4).
+//   reset         the Reset button (a trigger) restarts integrated, LRA, maxima and true peak.
+//   reference     S and I readouts turn orange at or above it (drawn by the display).
+//
+// Display outputs (no value yet = -200):
+//   ui_a: momentary, short-term, integrated (LUFS), Reference (LUFS, plus a tiny heartbeat so the
+//         drawings refresh when only the knob moves)
+//   ui_b: true peak max since Reset (dBTP), heartbeat, 0, true peak of the last 100 ms (dBTP)
+// Values for other UI (Master Bo reads them from the device's hidden readout atoms "BO LUFS M/S/I/TP"),
+// sent every 100 ms (no value yet = -100): m_val, s_val, i_val, tp_val (true peak max)
+struct bo_lufs
+{
+    audio_inport<f32<2>> in;
+    audio_inport<f32> reference;
+    event_inport<void> reset_btn
+    {
+        clear_all();
+    }
+    audio_outport<f32<2>> out;
+    audio_outport<f32<4>> ui_a;
+    audio_outport<f32<4>> ui_b;
+    value_outport<f32> m_val;
+    value_outport<f32> s_val;
+    value_outport<f32> i_val;
+    value_outport<f32> tp_val;
+
+    // K-weighting (transposed direct form II, f64)
+    f64 ab0 = 1.0;
+    f64 ab1 = 0.0;
+    f64 ab2 = 0.0;
+    f64 aa1 = 0.0;
+    f64 aa2 = 0.0;
+    f64 ba1 = 0.0;
+    f64 ba2 = 0.0;
+    f64 sa1_l = 0.0;
+    f64 sa2_l = 0.0;
+    f64 sb1_l = 0.0;
+    f64 sb2_l = 0.0;
+    f64 sa1_r = 0.0;
+    f64 sa2_r = 0.0;
+    f64 sb1_r = 0.0;
+    f64 sb2_r = 0.0;
+
+    // 100 ms blocks
+    i32 blk_len = 4800;
+    i32 blk_pos = 0;
+    f64 acc = 0.0;
+    f64[30] ring;
+    i32 ring_pos = 0;
+    i32 nblocks = 0;
+
+    // integrated: histogram of momentary blocks
+    f64[800] ih_n;
+    f64[800] ih_e;
+    f64 i_n = 0.0;
+    f64 i_e = 0.0;
+
+    // loudness range: histogram of short-term values
+    f64[800] sh_n;
+    f64[800] sh_e;
+    f64 s_n = 0.0;
+    f64 s_e = 0.0;
+
+    f32 v_m = -200.0;
+    f32 v_s = -200.0;
+    f32 v_i = -200.0;
+    f32 v_lra = -200.0;
+    f32 v_mmax = -200.0;
+    f32 v_smax = -200.0;
+
+    // true peak: coefficients [phase * 12 + k], history [ch * 24 + i] (each sample stored twice)
+    f32[48] tpc;
+    f32[48] th;
+    i32 th_pos = 0;
+    f32 tp_blk = 0.0;
+    f32 tp_max = 0.0;
+    f32 tp_last = 0.0;
+
+    f32 beat = 0.0;
+    bool inited = false;
+    bool dirty = true;
+
+    f64 lufs(f64 e)
+    {
+        return -0.691 + 10.0 * log10(e + 1e-30);
+    }
+
+    f32 todb(f32 a)
+    {
+        f32 r = -200.0;
+        if (a > 1e-10)
+            r = 20.0 * log10(a);
+        return r;
+    }
+
+
+
+    // bin of a loudness value: 0.1 LU from -70, clamped to 0..799
+    i32 bin_of(f64 l)
+    {
+        f64 b = floor((l + 70.0) * 10.0);
+        if (b < 0.0)
+            b = 0.0;
+        if (b > 799.0)
+            b = 799.0;
+        return cast(b, i32);
+    }
+
+    void design_k()
+    {
+        f64 rate = cast(EC.samplerate, f64);
+        f64 th1 = 3.141592653589793 * 1681.974450955533 / rate;
+        f64 k = sin(th1) / cos(th1);
+        f64 q = 0.7071752369554196;
+        f64 vh = 1.5848647011308556;   // 10^(3.999843853973347 / 20)
+        f64 vb = 1.2587209302325617;   // vh^0.4996667741545416
+        f64 a0 = 1.0 + k / q + k * k;
+        ab0 = (vh + vb * k / q + k * k) / a0;
+        ab1 = 2.0 * (k * k - vh) / a0;
+        ab2 = (vh - vb * k / q + k * k) / a0;
+        aa1 = 2.0 * (k * k - 1.0) / a0;
+        aa2 = (1.0 - k / q + k * k) / a0;
+        f64 th2 = 3.141592653589793 * 38.13547087602444 / rate;
+        f64 k2 = sin(th2) / cos(th2);
+        f64 q2 = 0.5003270373238773;
+        f64 c0 = 1.0 + k2 / q2 + k2 * k2;
+        ba1 = 2.0 * (k2 * k2 - 1.0) / c0;
+        ba2 = (1.0 - k2 / q2 + k2 * k2) / c0;
+        blk_len = cast(floor(rate * 0.1 + 0.5), i32);
+    }
+
+    void clear_all()
+    {
+        for (i32 i = 0; (i < 800); ++i)
+        {
+            ih_n[i] = 0.0;
+            ih_e[i] = 0.0;
+            sh_n[i] = 0.0;
+            sh_e[i] = 0.0;
+        }
+        for (i32 j = 0; (j < 30); ++j)
+            ring[j] = 0.0;
+        ring_pos = 0;
+        nblocks = 0;
+        blk_pos = 0;
+        acc = 0.0;
+        i_n = 0.0;
+        i_e = 0.0;
+        s_n = 0.0;
+        s_e = 0.0;
+        v_m = -200.0;
+        v_s = -200.0;
+        v_i = -200.0;
+        v_lra = -200.0;
+        v_mmax = -200.0;
+        v_smax = -200.0;
+        tp_blk = 0.0;
+        tp_max = 0.0;
+        tp_last = 0.0;
+        dirty = true;
+    }
+
+    // integrated loudness from the momentary histogram (BS.1770-4 two-stage gate)
+    f32 integrated()
+    {
+        f32 r = -200.0;
+        if (i_n > 0.0)
+        {
+            f64 gate = (lufs(i_e / i_n) - 10.0 + 70.0) * 10.0;   // in bins
+            f64 n = 0.0;
+            f64 e = 0.0;
+            for (i32 b = 0; (b < 800); ++b)
+            {
+                if ((cast(b, f64) + 0.5) > gate)
+                {
+                    n = n + ih_n[b];
+                    e = e + ih_e[b];
+                }
+            }
+            if (n > 0.0)
+                r = cast(lufs(e / n), f32);
+        }
+        return r;
+    }
+
+    // loudness range from the short-term histogram (EBU Tech 3342)
+    f32 lra()
+    {
+        f32 r = -200.0;
+        if (s_n > 0.0)
+        {
+            f64 gate = (lufs(s_e / s_n) - 20.0 + 70.0) * 10.0;
+            f64 n = 0.0;
+            for (i32 b = 0; (b < 800); ++b)
+            {
+                if ((cast(b, f64) + 0.5) > gate)
+                    n = n + sh_n[b];
+            }
+            if (n > 0.0)
+            {
+                f64 lo = -1.0;
+                f64 hi = -1.0;
+                f64 c = 0.0;
+                for (i32 b2 = 0; (b2 < 800); ++b2)
+                {
+                    f64 bc = cast(b2, f64) + 0.5;
+                    if (bc > gate)
+                    {
+                        c = c + sh_n[b2];
+                        if ((lo < 0.0) && (c >= 0.1 * n))
+                            lo = bc;
+                        if ((hi < 0.0) && (c >= 0.95 * n))
+                            hi = bc;
+                    }
+                }
+                r = cast((hi - lo) * 0.1, f32);
+            }
+        }
+        return r;
+    }
+
+    // one 100 ms block finished
+    void end_block()
+    {
+        ring[ring_pos] = acc;
+        ring_pos = ring_pos + 1;
+        if (ring_pos >= 30)
+            ring_pos = 0;
+        acc = 0.0;
+        blk_pos = 0;
+        if (nblocks < 2000000000)
+            nblocks = nblocks + 1;
+
+        f64 e4 = 0.0;
+        f64 e30 = 0.0;
+        for (i32 j = 0; (j < 30); ++j)
+        {
+            i32 idx = ring_pos - 1 - j;
+            if (idx < 0)
+                idx = idx + 30;
+            e30 = e30 + ring[idx];
+            if (j < 4)
+                e4 = e4 + ring[idx];
+        }
+        f64 bl = cast(blk_len, f64);
+        f64 em = e4 / (4.0 * bl);
+        f64 es = e30 / (30.0 * bl);
+        f64 lm = lufs(em);
+        f64 ls = lufs(es);
+        v_m = cast(fmax(lm, -200.0), f32);
+        v_s = cast(fmax(ls, -200.0), f32);
+        v_mmax = fmax(v_mmax, v_m);
+        v_smax = fmax(v_smax, v_s);
+
+        if ((nblocks >= 4) && (lm > -70.0))
+        {
+            i32 b = bin_of(lm);
+            ih_n[b] = ih_n[b] + 1.0;
+            ih_e[b] = ih_e[b] + em;
+            i_n = i_n + 1.0;
+            i_e = i_e + em;
+            v_i = integrated();
+        }
+        if ((nblocks >= 30) && (ls > -70.0))
+        {
+            i32 b3 = bin_of(ls);
+            sh_n[b3] = sh_n[b3] + 1.0;
+            sh_e[b3] = sh_e[b3] + es;
+            s_n = s_n + 1.0;
+            s_e = s_e + es;
+            v_lra = lra();
+        }
+        tp_last = tp_blk;
+        tp_blk = 0.0;
+        dirty = true;
+    }
+
+    // largest |interpolated value| of one channel's newest sample (history at base o)
+    f32 tp_channel(i32 o)
+    {
+        f32 m = fabs(th[o + th_pos + 12]);
+        for (i32 p = 0; (p < 4); ++p)
+        {
+            f32 y = 0.0;
+            i32 c = p * 12;
+            for (i32 k = 0; (k < 12); ++k)
+                y = y + tpc[c + k] * th[o + th_pos + 12 - k];
+            m = fmax(m, fabs(y));
+        }
+        return m;
+    }
+
+    // everything a fresh instance needs. Bitwig does not run the reset block when a device is
+    // inserted (the first build measured with the coefficients' initial values), so process calls
+    // this once itself; reset still calls it.
+    void init_all()
+    {
+TP_FILL
+        for (i32 i = 0; (i < 48); ++i)
+            th[i] = 0.0;
+        th_pos = 0;
+        sa1_l = 0.0;
+        sa2_l = 0.0;
+        sb1_l = 0.0;
+        sb2_l = 0.0;
+        sa1_r = 0.0;
+        sa2_r = 0.0;
+        sb1_r = 0.0;
+        sb2_r = 0.0;
+        design_k();
+        clear_all();
+    }
+
+    reset
+    {
+        init_all();
+    }
+
+    process
+    {
+        if (!inited)
+        {
+            inited = true;
+            init_all();
+        }
+        f32<2> x = in;
+        out[0] = x[0];
+        out[1] = x[1];
+
+        // K-weighting
+        f64 xl = cast(x[0], f64);
+        f64 xr = cast(x[1], f64);
+        f64 yl = ab0 * xl + sa1_l;
+        sa1_l = ab1 * xl - aa1 * yl + sa2_l;
+        sa2_l = ab2 * xl - aa2 * yl;
+        f64 zl = yl + sb1_l;
+        sb1_l = -2.0 * yl - ba1 * zl + sb2_l;
+        sb2_l = yl - ba2 * zl;
+        f64 yr = ab0 * xr + sa1_r;
+        sa1_r = ab1 * xr - aa1 * yr + sa2_r;
+        sa2_r = ab2 * xr - aa2 * yr;
+        f64 zr = yr + sb1_r;
+        sb1_r = -2.0 * yr - ba1 * zr + sb2_r;
+        sb2_r = yr - ba2 * zr;
+        acc = acc + zl * zl + zr * zr;
+
+        // true peak: newest sample at th[o + th_pos + 12] (and th[o + th_pos])
+        th_pos = th_pos + 1;
+        if (th_pos >= 12)
+            th_pos = 0;
+        th[th_pos] = x[0];
+        th[th_pos + 12] = x[0];
+        th[24 + th_pos] = x[1];
+        th[24 + th_pos + 12] = x[1];
+        f32 tp = fmax(tp_channel(0), tp_channel(24));
+        tp_blk = fmax(tp_blk, tp);
+        tp_max = fmax(tp_max, tp);
+
+        blk_pos = blk_pos + 1;
+        if (blk_pos >= blk_len)
+            end_block();
+
+        if (dirty)
+        {
+            dirty = false;
+            send m_val fmax(v_m, -100.0);
+            send s_val fmax(v_s, -100.0);
+            send i_val fmax(v_i, -100.0);
+            send tp_val fmax(todb(tp_max), -100.0);
+        }
+        beat = 1e-7 - beat;
+        ui_a[0] = v_m;
+        ui_a[1] = v_s;
+        ui_a[2] = v_i;
+        ui_a[3] = reference + beat;
+        ui_b[0] = todb(tp_max);
+        ui_b[1] = beat;
+        ui_b[2] = 0.0;
+        ui_b[3] = todb(fmax(tp_last, tp_blk));
+    }
+}

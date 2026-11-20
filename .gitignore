@@ -1,0 +1,15 @@
+# Bitwig's own files and anything made from them stay local
+*.jar
+jars/
+kit/
+fw/
+# build output
+build/
+out/
+*.class
+__pycache__/
+*.pyc
+# local scratch
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,90 @@
+// BO LUFS: bar meters M, S (LUFS) and TP (dBTP, last 100 ms) on one scale, 0 .. -60.
+// Orange line across M and S: integrated. Thin light lines: maxima since reset.
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+BO_FONT
+
+float boY(float db, float top, float h) {
+    return top + clamp(-db / 60., 0., 1.) * h;
+}
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float noData = step(audioHigh.y, 1.);
+    float top = 6.;
+    float h = boRes.y - top - 16.;
+    float bottom = top + h;
+    float scaleW = 18.;
+    float gap = 3.;
+    float bw = floor((boRes.x - scaleW - 4. - 2. * gap) / 3.);
+    float x0 = scaleW;
+
+    float3 col = float3(.075, .082, .092);
+
+    // which bar (0 M, 1 S, 2 TP) and position inside it
+    float bi = floor((fragCoord.x - x0) / (bw + gap));
+    float bx = fragCoord.x - x0 - bi * (bw + gap);
+    float inBar = step(0., bi) * step(bi, 2.) * step(0., bx) * step(bx, bw - 1.) * step(top, fragCoord.y) * step(fragCoord.y, bottom);
+
+    float vM = noData > .5 ? -200. : audioLow.x;
+    float vS = noData > .5 ? -200. : audioLow.y;
+    float vT = noData > .5 ? -200. : audioMedium.y;
+    float mM = noData > .5 ? -200. : audioMedium.z;
+    float mS = noData > .5 ? -200. : audioMedium.w;
+    float mT = noData > .5 ? -200. : audioMedium.x;
+    float vI = noData > .5 ? -200. : audioLow.z;
+
+    float v = bi < .5 ? vM : (bi < 1.5 ? vS : vT);
+    float mx = bi < .5 ? mM : (bi < 1.5 ? mS : mT);
+    float3 fillCol = bi < .5 ? float3(.80, .82, .86) : (bi < 1.5 ? float3(.60, .68, .76) : float3(.62, .82, .76));
+
+    // track, ticks every 6 dB
+    col = mix(col, float3(.045, .05, .058), inBar);
+    float tick = 6. * h / 60.;
+    float ty = fragCoord.y - top;
+    float onTick = 1. - step(.75, abs(ty - floor(ty / tick + .5) * tick));
+    col = mix(col, float3(.10, .11, .125), inBar * onTick);
+
+    // fill
+    float yv = boY(v, top, h);
+    float filled = inBar * step(yv, fragCoord.y) * step(-199., v);
+    float over = step(fragCoord.y, boY(-1., top, h)) * (bi > 1.5 ? 1. : 0.);
+    col = mix(col, over > .5 ? float3(.95, .33, .30) : fillCol, filled * .85);
+
+    // max line
+    float ym = boY(mx, top, h);
+    col = mix(col, float3(.92, .93, .95), inBar * step(-199., mx) * (1. - step(1., abs(fragCoord.y - ym))));
+
+    // integrated across M and S
+    float yi = boY(vI, top, h);
+    float onI = inBar * step(bi, 1.5) * step(-199., vI) * (1. - step(1.2, abs(fragCoord.y - yi)));
+    col = mix(col, float3(.96, .58, .25), onI);
+
+    // scale: ticks and numbers every 12 dB (shown without minus)
+    float k12 = floor((fragCoord.y - top) / (12. * h / 60.) + .5);
+    float yl = top + k12 * 12. * h / 60.;
+    float n = k12 * 12.;
+    float sc = step(-.5, k12) * step(k12, 5.5);
+    float chH = 7.;
+    float tens = floor(n / 10.);
+    float ones = n - 10. * tens;
+    float lx = scaleW - 5. - 2. * 5.;
+    float lab = sc * max(boChar(fragCoord, float2(lx, yl - 3.5), chH, tens > .5 ? tens : 13.),
+                         boChar(fragCoord, float2(lx + 5., yl - 3.5), chH, ones));
+    col = mix(col, float3(.45, .47, .51), lab);
+    float tk = sc * step(scaleW - 4., fragCoord.x) * step(fragCoord.x, scaleW - 1.) * (1. - step(.75, abs(fragCoord.y - yl)));
+    col = mix(col, float3(.30, .32, .36), tk);
+
+    // bar names under the bars
+    float nameH = 8.;
+    float ny = bottom + 5.;
+    float cx = x0 + bi * (bw + gap) + floor(bw * .5);
+    float c0 = bi < .5 ? 20. : (bi < 1.5 ? 21. : 26.);
+    float nm = boChar(fragCoord, float2(bi > 1.5 ? cx - 6. : cx - 2., ny), nameH, c0);
+    nm = max(nm, bi > 1.5 ? boChar(fragCoord, float2(cx + 1., ny), nameH, 27.) : 0.);
+    col = mix(col, float3(.52, .54, .58), nm * step(0., bi) * step(bi, 2.));
+
+    return half4(half3(col), 1.);
+}

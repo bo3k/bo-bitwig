@@ -1,0 +1,111 @@
+// BO Scope: passes the audio through unchanged and feeds L and R to Bitwig's own oscilloscope
+// (inputs A and B; its other inputs stay unconnected: feeding them crashes the audio engine),
+// whose sample buffers Master Bo reads for its goniometer.
+//
+// Its own panel shows the goniometer's outline: the point cloud's reach in 11 directions over the
+// half circle (mid up, side across; audio's cloud is point-symmetric, the shader mirrors it),
+// each the largest radius sqrt(M^2 + S^2) seen there (M = (L + R) / 2, S = (R - L) / 2: full-scale mono = 1, as Master Bo), released to about 5 % in 1 s, and the
+// correlation (-1 .. +1, about 300 ms). "Display" off: only the panel stops (sectors and correlation
+// are no longer worked out); the feed to Master Bo goes on.
+//   ui_a: sectors 0..3   ui_b: sectors 4..7   ui_c: sectors 8..10, correlation (9 = display off)
+struct bo_scope
+{
+    audio_inport<f32<2>> in;
+    audio_outport<f32<2>> out;
+    audio_outport<f32> sc_l;
+    audio_outport<f32> sc_r;
+    audio_outport<f32<4>> ui_a;
+    audio_outport<f32<4>> ui_b;
+    audio_outport<f32<4>> ui_c;
+    value_inport<bool> show;
+
+    f32[11] sec;
+    f32 lr = 0.0;
+    f32 ll = 0.0;
+    f32 rr = 0.0;
+    f32 corr = 0.0;
+    f32 rel = 0.0;
+    f32 avg = 0.0;
+    i32 count = 0;
+    bool inited = false;
+
+    process
+    {
+        f32<2> x = in;
+        out[0] = x[0];
+        out[1] = x[1];
+        sc_l = x[0];
+        sc_r = x[1];
+        if (!inited)
+        {
+            inited = true;
+            f32 rate = cast(EC.samplerate, f32);
+            rel = exp(-3.0 * 64.0 / rate);   // per 64 samples: 5 % after 1 s
+            avg = 1.0 - exp(-1.0 / (0.3 * rate));
+            for (i32 i = 0; (i < 11); ++i)
+                sec[i] = 0.0;
+        }
+        if (!show)
+            ui_c[3] = 9.0;
+        else
+        {
+            analyse(x[0], x[1]);
+            ui_a[0] = sec[0];
+            ui_a[1] = sec[1];
+            ui_a[2] = sec[2];
+            ui_a[3] = sec[3];
+            ui_b[0] = sec[4];
+            ui_b[1] = sec[5];
+            ui_b[2] = sec[6];
+            ui_b[3] = sec[7];
+            ui_c[0] = sec[8];
+            ui_c[1] = sec[9];
+            ui_c[2] = sec[10];
+            ui_c[3] = corr;
+        }
+    }
+
+    void analyse(f32 l, f32 r)
+    {
+        // mid up, side across; folded to the upper half
+        f32 m = (l + r) * 0.70710678;
+        f32 s = (r - l) * 0.70710678;
+        if (m < 0.0)
+        {
+            m = -m;
+            s = -s;
+        }
+        f32 as = fabs(s);
+        f32 rad = sqrt((l * l + r * r) * 0.5);   // sqrt(M^2 + S^2), M = (L + R) / 2, S = (R - L) / 2
+        if (rad > 1e-6)
+        {
+            // the angle from +side (0) through mid (pi/2) to -side (pi), atan approximated (< 0.004 rad)
+            f32 a = fmin(as, m) / fmax(fmax(as, m), 1e-9);
+            f32 t = a * 0.78539816 + 0.273 * a * (1.0 - a);
+            if (m > as)
+                t = 1.57079633 - t;
+            if (s < 0.0)
+                t = 3.14159265 - t;
+            i32 k = cast(floor(t * 11.0 / 3.14159265), i32);
+            if (k > 10)
+                k = 10;
+            if (k < 0)
+                k = 0;
+            sec[k] = fmax(sec[k], rad);
+        }
+        lr = lr + avg * (l * r - lr);
+        ll = ll + avg * (l * l - ll);
+        rr = rr + avg * (r * r - rr);
+        count = count + 1;
+        if (count >= 64)
+        {
+            count = 0;
+            for (i32 i = 0; (i < 11); ++i)
+                sec[i] = sec[i] * rel;
+            f32 p = ll * rr;
+            corr = 0.0;
+            if (p > 1e-12)
+                corr = lr / sqrt(p);
+        }
+    }
+}

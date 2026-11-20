@@ -1,0 +1,128 @@
+// BO Spectrum: one part of the panel's graph (the build sets BO_FIRST, its first band, and BO_COUNT):
+// on the analysers' grey face (47, 47, 47, as Master Bo's), 0 dB at the top, 72 dB down; faint lines every 12 dB and at the octaves
+// 20, 40, 80 .. 20k Hz.
+//   Bars: each band's column cut into a bar (about 3/4) and a gap, pixel-snapped, all the same width.
+//   Plot: a smooth curve through the bands' centres, filled below; it runs on into the
+//         next drawing with the neighbouring bands (slot 0: the band before, slot BO_COUNT + 1: after).
+// Stereo: orange. M/S: mid orange, side blue in front. Peak hold: a light line (bars: on top of each
+// bar; Plot: a thin curve).
+// Slots (audioLow, audioMedium, audioHigh.xyz): the band before, the drawing's bands, the band after;
+// each 65536 * a + 256 * b + c (a stereo or mid, b side, c hold; round(-dB * 2), 255 = none).
+// audioHigh.w: -1 off, else slope (dB per octave around 1 kHz) + 10 in M/S + 20 in Plot.
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+float boSlot(float i) {
+    if (i < .5) return audioLow.x;
+    if (i < 1.5) return audioLow.y;
+    if (i < 2.5) return audioLow.z;
+    if (i < 3.5) return audioLow.w;
+    if (i < 4.5) return audioMedium.x;
+    if (i < 5.5) return audioMedium.y;
+    if (i < 6.5) return audioMedium.z;
+    if (i < 7.5) return audioMedium.w;
+    if (i < 8.5) return audioHigh.x;
+    if (i < 9.5) return audioHigh.y;
+    return audioHigh.z;
+}
+
+// one of the three levels of a band (k: 0 stereo/mid, 1 side, 2 hold) in dB with the slope, or 999 (none)
+float boLevel(float boBand, float k, float boSlope) {
+    float boV = boSlot(clamp(boBand - BO_FIRST + 1., 0., BO_COUNT + 1.));
+    float boA = floor(boV / 65536.);
+    float boR = boV - 65536. * boA;
+    float boB = floor(boR / 256.);
+    float boC = boR - 256. * boB;
+    float boQ = k < .5 ? boA : (k < 1.5 ? boB : boC);
+    return boQ > 254.5 ? 999. : -boQ * .5 + boSlope * (boBand - 17.) * .33219281;
+}
+
+float boYOf(float boDb, float boH) {
+    return boDb > 998. ? boH + 2. : clamp(-boDb / 72., 0., 1.) * boH;
+}
+
+// the curve's height (px from the top) at a fractional band position: a cubic through the band centres
+// (Catmull-Rom; the drawing has one band beyond each edge, further ones repeat it)
+float boY(float boB, float k, float boSlope, float boH) {
+    return boYOf(boLevel(clamp(boB, max(0., BO_FIRST - 1.), min(30., BO_FIRST + BO_COUNT)), k, boSlope), boH);
+}
+
+float boCurve(float boU, float k, float boSlope, float boH) {
+    boU = clamp(boU, 0., 30.);
+    float boU1 = min(floor(boU), 29.);
+    float boT = boU - boU1;
+    float boP0 = boY(boU1 - 1., k, boSlope, boH);
+    float boP1 = boY(boU1, k, boSlope, boH);
+    float boP2 = boY(boU1 + 1., k, boSlope, boH);
+    float boP3 = boY(boU1 + 2., k, boSlope, boH);
+    float boT2 = boT * boT, boT3 = boT2 * boT;
+    float boV = .5 * (2. * boP1 + (boP2 - boP0) * boT + (2. * boP0 - 5. * boP1 + 4. * boP2 - boP3) * boT2
+                      + (3. * boP1 - boP0 - 3. * boP2 + boP3) * boT3);
+    return clamp(boV, 0., boH + 2.);
+}
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float boW = boRes.x / BO_COUNT;              // one band's column
+    float3 boCol = float3(.184, .184, .184);
+    float3 boOrange = float3(1., .529, .075);
+    float3 boBlue = float3(.275, .588, 1.);
+    float boState = audioHigh.w;
+    float boOff = step(boState, -.5);
+    float boPlot = step(19.5, boState);
+    float boMs = step(9.5, boState - 20. * boPlot);
+    float boSlope = boState - 20. * boPlot - 10. * boMs;
+    float boPxDb = boRes.y / 72.;
+    float boH = boRes.y;
+    // the grid
+    float boG = 0.;
+    for (int k = 1; k < 6; k++) {
+        float boY = floor(float(k) * 12. * boPxDb) + .5;
+        boG = max(boG, 1. - step(.6, abs(fragCoord.y - boY)));
+    }
+    for (int k = 0; k < 11; k++) {
+        float boB = 17. + 10. * log(20. * exp2(float(k)) / 1000.) / log(10.);
+        float boX = floor((boB - BO_FIRST + .5) * boW) + .5;
+        boG = max(boG, 1. - step(.6, abs(fragCoord.x - boX)));
+    }
+    boCol = mix(boCol, float3(.27, .27, .27), boG);
+    if (boOff < .5) {
+        if (boPlot < .5) {
+            float boI = floor(fragCoord.x / boW);
+            float boBand = BO_FIRST + boI;
+            float boBw = max(1., floor(boW * .76));
+            float boX0 = floor(boI * boW + (boW - boBw) * .5);
+            float boInBar = step(boX0, fragCoord.x) * step(fragCoord.x, boX0 + boBw - .01) * step(boI, BO_COUNT - .5);
+            float boTopA = floor(boYOf(boLevel(boBand, 0., boSlope), boH));
+            float boTopB = floor(boYOf(boLevel(boBand, 1., boSlope), boH));
+            float boTopC = floor(boYOf(boLevel(boBand, 2., boSlope), boH));
+            boCol = boInBar * step(boTopA, fragCoord.y) > .5 ? boOrange : boCol;
+            boCol = boInBar * boMs * step(boTopB, fragCoord.y) > .5 ? boBlue : boCol;
+            float boOnHold = boInBar * step(boTopC, fragCoord.y) * step(fragCoord.y, boTopC + 2.) * step(boTopC, boH);
+            boCol = boOnHold > .5 ? float3(1., .86, .7) : boCol;
+        } else {
+            float boU = BO_FIRST + fragCoord.x / boW - .5;   // the band position (centres at whole numbers)
+            float boE = .5 / boW;                             // half a pixel in bands
+            float boYa = boCurve(boU, 0., boSlope, boH);
+            float boDa = abs(boCurve(boU + boE, 0., boSlope, boH) - boCurve(boU - boE, 0., boSlope, boH));
+            float boLineA = 1. - smoothstep(.7 + .5 * boDa, 1.4 + .5 * boDa, abs(fragCoord.y - boYa));
+            boCol = mix(boCol, boOrange, .24 * step(boYa, fragCoord.y) * step(boYa, boH));
+            if (boMs > .5) {
+                float boYb = boCurve(boU, 1., boSlope, boH);
+                float boDb = abs(boCurve(boU + boE, 1., boSlope, boH) - boCurve(boU - boE, 1., boSlope, boH));
+                float boLineB = 1. - smoothstep(.7 + .5 * boDb, 1.4 + .5 * boDb, abs(fragCoord.y - boYb));
+                boCol = mix(boCol, boBlue, .30 * step(boYb, fragCoord.y) * step(boYb, boH));
+                boCol = mix(boCol, boOrange, boLineA * step(boYa, boH));
+                boCol = mix(boCol, boBlue, boLineB * step(boYb, boH));
+            } else {
+                boCol = mix(boCol, boOrange, boLineA * step(boYa, boH));
+            }
+            float boYc = boCurve(boU, 2., boSlope, boH);
+            float boDc = abs(boCurve(boU + boE, 2., boSlope, boH) - boCurve(boU - boE, 2., boSlope, boH));
+            float boLineC = 1. - smoothstep(.4 + .5 * boDc, 1. + .5 * boDc, abs(fragCoord.y - boYc));
+            boCol = mix(boCol, float3(1., .86, .7), .8 * boLineC * step(boYc, boH));
+        }
+    }
+    return half4(half3(boCol), 1.);
+}

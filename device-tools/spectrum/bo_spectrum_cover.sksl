@@ -1,0 +1,9 @@
+// BO Spectrum: covers the invisible reset buttons over the scales with the panel's grey (69, 69, 69).
+// An overlay, so clicks go through to the buttons; the scale's numbers (labels) are drawn above it.
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+half4 main(float2 fragCoord) {
+    return half4(.2706, .2706, .2706, 1.);
+}

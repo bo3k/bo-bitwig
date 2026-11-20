@@ -1,0 +1,13 @@
+// BO LUFS: background box for a readout row, in the look of Bitwig's meters
+// (1 px dark frame, dark grey inside).
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float boFrame = step(fragCoord.x, 1.) + step(boRes.x - 1., fragCoord.x) + step(fragCoord.y, 1.) + step(boRes.y - 1., fragCoord.y);
+    float3 boCol = boFrame > .5 ? float3(.102, .102, .102) : float3(.184, .184, .184);
+    boCol = audioLow.w > 1. ? float3(.184, .184, .184) : boCol;
+    return half4(half3(boCol), 1.);
+}

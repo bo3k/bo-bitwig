@@ -1,0 +1,102 @@
+// Sans-style stroke digits for BO LUFS (drawn by distance, like tick marks).
+// Cell: x 0..1, y 0..2 (y down). Codes: 0-9, 10 '-', 11 '+', 12 '.', 13 blank.
+float boSeg(float2 p, float2 a, float2 b) {
+    float2 pa = p - a;
+    float2 ba = b - a;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0., 1.);
+    return length(pa - ba * float2(h, h));
+}
+
+float boRing(float2 p, float2 c, float r) {
+    return abs(length(p - c) - r);
+}
+
+// arc of circle (c, r) between angles a0 < a1 (radians, y down; a1 may exceed pi)
+float boArc(float2 p, float2 c, float r, float a0, float a1) {
+    float2 d = p - c;
+    float a = atan(d.y, d.x);
+    float a2 = a + 6.2831853;
+    float inside = (a >= a0 && a <= a1) || (a2 >= a0 && a2 <= a1) ? 1. : 0.;
+    float2 e0 = c + float2(r * cos(a0), r * sin(a0));
+    float2 e1 = c + float2(r * cos(a1), r * sin(a1));
+    return inside > .5 ? abs(length(d) - r) : min(length(p - e0), length(p - e1));
+}
+
+float boIsC(float c, float k) {
+    return 1. - step(.5, abs(c - k));
+}
+
+float boDigitD(float2 q, float c) {
+    float big = 9.;
+    float d = big;
+    // 0: rounded outline
+    float2 q0 = abs(q - float2(.5, 1.)) - float2(0., .5);
+    float r0 = abs(length(max(q0, float2(0., 0.))) + min(max(q0.x, q0.y), 0.) - .5);
+    d = boIsC(c, 0.) > .5 ? r0 : d;
+    // 1
+    d = boIsC(c, 1.) > .5 ? min(boSeg(q, float2(.58, 0.), float2(.58, 2.)), boSeg(q, float2(.58, 0.), float2(.2, .34))) : d;
+    // 2
+    d = boIsC(c, 2.) > .5 ? min(min(boArc(q, float2(.5, .52), .48, -3.1416, .6), boSeg(q, float2(.89, .8), float2(0., 2.))),
+                                 boSeg(q, float2(0., 2.), float2(1., 2.))) : d;
+    // 3
+    d = boIsC(c, 3.) > .5 ? min(boArc(q, float2(.5, .5), .48, -2.7, 1.5708), boArc(q, float2(.5, 1.48), .52, -1.5708, 2.7)) : d;
+    // 4
+    d = boIsC(c, 4.) > .5 ? min(min(boSeg(q, float2(.75, 2.), float2(.75, 0.)), boSeg(q, float2(.75, 0.), float2(0., 1.42))),
+                                 boSeg(q, float2(0., 1.42), float2(1., 1.42))) : d;
+    // 5
+    d = boIsC(c, 5.) > .5 ? min(min(boSeg(q, float2(.95, 0.), float2(.12, 0.)), boSeg(q, float2(.12, 0.), float2(.07, .92))),
+                                 boArc(q, float2(.47, 1.43), .55, -2.26, 2.62)) : d;
+    // 6
+    d = boIsC(c, 6.) > .5 ? min(boRing(q, float2(.5, 1.46), .5), boArc(q, float2(1.94, 1.46), 1.94, 3.1416, 3.98)) : d;
+    // 7
+    d = boIsC(c, 7.) > .5 ? min(boSeg(q, float2(0., 0.), float2(1., 0.)), boSeg(q, float2(1., 0.), float2(.36, 2.))) : d;
+    // 8
+    d = boIsC(c, 8.) > .5 ? min(boRing(q, float2(.5, .47), .44), boRing(q, float2(.5, 1.48), .52)) : d;
+    // 9
+    d = boIsC(c, 9.) > .5 ? min(boRing(q, float2(.5, .54), .5), boArc(q, float2(-.94, .54), 1.94, 0., .84)) : d;
+    // - and +
+    float dm = boSeg(q, float2(.12, 1.18), float2(.88, 1.18));
+    d = boIsC(c, 10.) > .5 ? dm : d;
+    d = boIsC(c, 11.) > .5 ? min(dm, boSeg(q, float2(.5, .8), float2(.5, 1.56))) : d;
+    // .
+    d = boIsC(c, 12.) > .5 ? max(length(q - float2(.5, 1.9)) - .06, 0.) : d;
+    return d;
+}
+
+// coverage of character c with its cell's top-left at o, height hPx
+float boDigit(float2 fragPx, float2 o, float hPx, float c) {
+    float u = hPx / 2.;
+    float2 q = (fragPx - o) / float2(u, u);
+    float w = max(.55, .07 * hPx);
+    float dPx = boDigitD(q, c) * u;
+    return 1. - smoothstep(w - .55, w + .55, dPx);
+}
+
+// value v printed right-aligned to xr, top y0, height h: [sign][tens]ones.tenths; no value: --.-
+float boValue(float2 fragPx, float v, float xr, float y0, float h, float plusSign) {
+    float none = step(v, -199.);
+    float a = min(abs(v), 99.94);
+    float t = floor(a * 10. + .5);
+    float tenths = t - 10. * floor(t / 10.);
+    float ones = floor(t / 10.) - 10. * floor(t / 100.);
+    float tens = floor(t / 100.);
+    float sign = step(.05, -v) > .5 ? 10. : (step(.05, v) * plusSign > .5 ? 11. : 13.);
+    float cw = h * .5;
+    float g = h * .16;
+    float l4 = xr - cw;
+    float l3 = l4 - g - cw * .45 - cw * .5 + cw * .5 - cw * .275;
+    float l2 = l4 - g - .55 * cw - g * .5 - cw;
+    float l1 = l2 - g - cw;
+    float hasTens = none > .5 ? 1. : step(.5, tens);
+    float l0 = (hasTens > .5 ? l1 : l2) - g - cw;
+    float c4 = none > .5 ? 10. : tenths;
+    float c2 = none > .5 ? 10. : ones;
+    float c1 = none > .5 ? 10. : tens;
+    float c0 = none > .5 ? 13. : sign;
+    float cov = boDigit(fragPx, float2(l4, y0), h, c4);
+    cov = max(cov, boDigit(fragPx, float2(l4 - g * .5 - cw * .75, y0), h, 12.));
+    cov = max(cov, boDigit(fragPx, float2(l2, y0), h, c2));
+    cov = max(cov, hasTens > .5 ? boDigit(fragPx, float2(l1, y0), h, c1) : 0.);
+    cov = max(cov, c0 < 12.5 ? boDigit(fragPx, float2(l0, y0), h, c0) : 0.);
+    return cov;
+}

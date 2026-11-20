@@ -1,0 +1,63 @@
+// BO LUFS: numeric readouts. Rows: M, S, I (LUFS), LRA (LU), TP max (dBTP).
+// audioLow:    momentary, short-term, integrated, LRA
+// audioMedium: true peak max, true peak (last 100 ms), momentary max, short-term max
+// audioHigh:   integration time (s), sample rate, 0, heartbeat
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+BO_FONT
+
+float boLabelCode(float row, float k) {
+    float r0 = k < .5 ? 20. : 13.;
+    float r1 = k < .5 ? 21. : 13.;
+    float r2 = k < .5 ? 22. : 13.;
+    float r3 = k < .5 ? 23. : (k < 1.5 ? 24. : 25.);
+    float r4 = k < .5 ? 26. : (k < 1.5 ? 27. : 13.);
+    return row < .5 ? r0 : (row < 1.5 ? r1 : (row < 2.5 ? r2 : (row < 3.5 ? r3 : r4)));
+}
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float boRowH = boRes.y / 5.;
+    float row = clamp(floor(fragCoord.y / boRowH), 0., 4.);
+    float charH = floor(boRowH * .56);
+    float adv = floor(charH * .78);
+    float y0 = row * boRowH + floor((boRowH - charH) * .5);
+
+    float noData = step(audioHigh.y, 1.);
+    float v = row < .5 ? audioLow.x : (row < 1.5 ? audioLow.y : (row < 2.5 ? audioLow.z : (row < 3.5 ? audioLow.w : audioMedium.x)));
+    v = noData > .5 ? -200. : v;
+    float signed0 = row > 3.5 ? 1. : 0.;
+
+    float3 col = float3(.075, .082, .092);
+    // row separators
+    float sepY = abs(fragCoord.y - floor(row * boRowH + .5));
+    col = mix(col, float3(.11, .12, .135), step(.5, row) * (1. - step(.75, sepY)));
+    // integrated row background
+    col = mix(col, float3(.10, .095, .09), boIs(row, 2.));
+
+    // label (left)
+    float xl0 = 6.;
+    float kl = floor((fragCoord.x - xl0) / adv);
+    float lab = 0.;
+    if (kl >= 0. && kl < 2.5) {
+        lab = boChar(fragCoord, float2(xl0 + kl * adv, y0), charH, boLabelCode(row, kl));
+    }
+    col = mix(col, float3(.52, .54, .58), lab);
+
+    // value (right aligned, 5 slots)
+    float xv0 = boRes.x - 6. - 5. * adv + (adv - charH * .5);
+    float kv = floor((fragCoord.x - xv0 + (adv - charH * .5) * .5) / adv);
+    float val = 0.;
+    if (kv >= 0. && kv < 4.5) {
+        val = boChar(fragCoord, float2(xv0 + kv * adv, y0), charH, boValueChar(v, kv, signed0));
+    }
+    float3 vcol = float3(.88, .89, .90);
+    vcol = boIs(row, 2.) > .5 ? float3(.96, .58, .25) : vcol;
+    vcol = (row > 3.5 && v > -1.) ? float3(.95, .33, .30) : vcol;
+    vcol = noData > .5 ? float3(.40, .42, .45) : vcol;
+    col = mix(col, vcol, val);
+
+    return half4(half3(col), 1.);
+}

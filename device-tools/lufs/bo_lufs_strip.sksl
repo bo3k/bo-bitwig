@@ -1,0 +1,32 @@
+// BO LUFS: the meter strip behind the bars, as the Tool device's: dark grey, a rounded light-grey
+// outline, and the scale's marks right of its numbers (the numbers are Bitwig labels on top), every
+// 6 dB from 0 to -36. The strip spans grid rows 11 .. 51 (the bars: rows 13 .. 49, 1 row per dB).
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+float boRoundBox(float2 p, float2 b, float r) {
+    float2 q = abs(p) - b + float2(r, r);
+    return length(max(q, float2(0., 0.))) + min(max(q.x, q.y), 0.) - r;
+}
+
+half4 main(float2 boFragIn) {
+    // drawn 1 px (at 100 %) higher in a display placed 1 grid unit (4 px) lower: 3 px under where it was
+    float2 fragCoord = float2(boFragIn.x, boFragIn.y + iResolution.xy.y / 160.);
+    float2 boRes = iResolution.xy;
+    float boU = boRes.y / 160.;                         // 40 grid units: 160 px at 100 %
+    float3 boCol = float3(.106, .106, .106);
+    float2 boHalf = float2(boRes.x * .5 - .5, boRes.y * .5 - .5);
+    float boD = boRoundBox(float2(fragCoord.x - boRes.x * .5, fragCoord.y - boRes.y * .5), boHalf, 5. * boU);
+    float boOutline = 1. - smoothstep(0., 1.2 * boU, abs(boD + .7 * boU));
+    float boOutside = smoothstep(-.5, .5, boD);
+    // the marks: right of the numbers (columns 6.3 .. 7.6), at rows 13 + dB (from the strip's top: 2 + dB)
+    float boMark = 0.;
+    for (int i = 0; i < 7; i++) {
+        float boY = (2. + 6. * float(i)) * 4. * boU + 1.;
+        boMark = max(boMark, (1. - step(boU * .9, abs(fragCoord.y - boY))) * step(6.3 * 4. * boU, fragCoord.x) * step(fragCoord.x, 7.6 * 4. * boU));
+    }
+    boCol = boMark > .5 ? float3(.62, .62, .62) : boCol;
+    // no outline and no rounding: a plain dark strip, edge to edge (no light corners)
+    return half4(half3(boCol), 1.);   // opaque: the corners outside the outline stay the strip's dark
+}

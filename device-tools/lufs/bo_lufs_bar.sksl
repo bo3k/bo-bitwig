@@ -1,0 +1,33 @@
+// BO LUFS: one loudness bar in the setting of Bitwig's Tool device meter (as BO Safety's): on the
+// meter strip's dark grey, a dark track nearly as wide as its column, filled in Bitwig's accent orange (TP: red at or above
+// 0 dBTP). Scale: linear -36 .. 0, bottom to top (1 px in from the display's edges).
+// audioLow: M, S, I, Reference   audioMedium: TP max, heartbeat, 0, TP (last 100 ms)
+// The build picks the reading (BO_VALUE) and whether it is the true-peak bar (BO_TP).
+// S and I bars (BO_REF) show the Reference as an orange line on the track (a dark cut where the fill covers it).
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+half4 main(float2 boFragIn) {
+    // drawn 1 px (at 100 %) higher in a display placed 1 grid unit (4 px) lower: 3 px under where it was
+    float2 fragCoord = float2(boFragIn.x, boFragIn.y + iResolution.xy.y / 144.);
+    float2 boRes = iResolution.xy;
+    float boU = boRes.y / 144.;                        // 36 grid units high: 144 px at 100 %
+    float boV = BO_VALUE;
+    float boTrackW = floor(boRes.x - 6. * boU);         // nearly as wide as the readout above
+    float boX0 = floor((boRes.x - boTrackW) * .5);
+    float boInTrack = step(boX0, fragCoord.x) * step(fragCoord.x, boX0 + boTrackW) * step(1., fragCoord.y) * step(fragCoord.y, boRes.y - 1.);
+    float boLevel = clamp((boV + 36.) / 36., 0., 1.);
+    float boTop = 1. + (boRes.y - 2.) * (1. - boLevel);
+    float boFill = step(boTop, fragCoord.y) * step(-199., boV);
+    float3 boTrack = float3(.176, .176, .176);
+    float3 boOrange = float3(1., .529, .075);
+    float3 boFillCol = (BO_TP > .5 && boV >= 0.) ? float3(.92, .22, .16) : boOrange;
+    float3 boCol = boFill > .5 ? boFillCol : boTrack;
+    // Reference (S and I): orange line on the track, dark cut through the fill
+    float boRefY = 1. + (boRes.y - 2.) * (1. - clamp((audioLow.w + 36.) / 36., 0., 1.));
+    float boOnRef = (BO_REF > .5 ? 1. : 0.) * (1. - smoothstep(.5, 1.5, abs(fragCoord.y - boRefY)));
+    boCol = mix(boCol, boFill > .5 ? boTrack : boOrange, boOnRef);
+    boCol = boInTrack > .5 ? boCol : float3(.106, .106, .106); // the strip around it
+    return half4(half3(boCol), 1.);
+}

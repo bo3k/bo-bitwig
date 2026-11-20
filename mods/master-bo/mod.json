@@ -1,0 +1,69 @@
+{
+  "manifest_version": 2,
+  "mod": {
+    "id": "master-bo",
+    "name": "Panel: bo Master",
+    "area": "Panel",
+    "version": "0.1.0-dev.71",
+    "author": "Bo",
+    "description": "A panel beside the browser side with the master track's strip: VU meter, LUFS (from bo LUFS), fader, pan, peak and RMS meters with peak hold, and the master's inserts with their windows.",
+    "documentation": "readme"
+  },
+  "built_against": {
+    "bitwig_version": "6.1.4",
+    "platform": "windows",
+    "architecture": "x64"
+  },
+  "targets": {
+    "drX.init": {
+      "kind": "method",
+      "owner": "drX",
+      "name": "<init>",
+      "descriptor": "()V"
+    },
+    "dve.cfM": {
+      "kind": "method",
+      "owner": "dve",
+      "name": "cfM",
+      "descriptor": "(LdJM;)V"
+    },
+    "dve.init": {
+      "kind": "method",
+      "owner": "dve",
+      "name": "<init>",
+      "descriptor": "()V"
+    }
+  },
+  "hooks": [],
+  "opens": [
+    "drX.init",
+    "dve.cfM",
+    "dve.init"
+  ],
+  "requires": [
+    {
+      "id": "panel-management-framework",
+      "min_version": "0.2.0-dev.2.bo.5"
+    }
+  ],
+  "resources": {
+    "readme": {
+      "kind": "file",
+      "path": "README.md",
+      "media_type": "text/markdown"
+    },
+    "master_bo_icon": {
+      "kind": "file",
+      "path": "resources/master-bo/master-bo.svg",
+      "media_type": "image/svg+xml"
+    }
+  },
+  "registrations": [
+    {
+      "id": "panels",
+      "consumer": "panel-management-framework",
+      "descriptor": "panels.properties",
+      "jar": "helper.jar"
+    }
+  ]
+}

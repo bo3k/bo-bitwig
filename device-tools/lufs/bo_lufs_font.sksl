@@ -1,0 +1,99 @@
+// Stroke font for BO LUFS: characters are line segments drawn by distance (the same primitive as
+// the tick marks that render reliably), 7-segment style. Only small numbers and comparisons.
+// Cell: x 0..1, y 0..2 (y down). Codes: 0-9 digits, 10 '-', 11 '+', 12 '.', 13 blank,
+// 20 M, 21 S, 22 I, 23 L, 24 R, 25 A, 26 T, 27 P, 28 U, 29 F, 30 B, 31 D.
+float boIs(float c, float k) {
+    return 1. - step(.5, abs(c - k));
+}
+
+float boSegD(float2 p, float2 a, float2 b) {
+    float2 pa = p - a;
+    float2 ba = b - a;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0., 1.);
+    return length(pa - ba * float2(h, h));
+}
+
+// distance from q (cell units) to the strokes of character c; 9. = nothing near
+float boCharD(float2 q, float c) {
+    float big = 9.;
+    float isDigit = step(c, 9.5);
+    float d = big;
+    // a (top)
+    float sa = isDigit * (1. - boIs(c, 1.) - boIs(c, 4.)) + boIs(c, 21.) + boIs(c, 24.) + boIs(c, 25.)
+             + boIs(c, 26.) + boIs(c, 27.) + boIs(c, 29.) + boIs(c, 30.) + boIs(c, 31.);
+    d = min(d, sa > .5 ? boSegD(q, float2(0., 0.), float2(1., 0.)) : big);
+    // b (upper right)
+    float sb = isDigit * (1. - boIs(c, 1.) - boIs(c, 5.) - boIs(c, 6.)) + boIs(c, 20.) + boIs(c, 24.) + boIs(c, 25.)
+             + boIs(c, 27.) + boIs(c, 28.) + boIs(c, 30.) + boIs(c, 31.);
+    d = min(d, sb > .5 ? boSegD(q, float2(1., 0.), float2(1., 1.)) : big);
+    // c (lower right)
+    float sc = isDigit * (1. - boIs(c, 1.) - boIs(c, 2.)) + boIs(c, 20.) + boIs(c, 21.) + boIs(c, 25.) + boIs(c, 28.)
+             + boIs(c, 30.) + boIs(c, 31.);
+    d = min(d, sc > .5 ? boSegD(q, float2(1., 1.), float2(1., 2.)) : big);
+    // d (bottom)
+    float sd = isDigit * (1. - boIs(c, 1.) - boIs(c, 4.) - boIs(c, 7.)) + boIs(c, 21.) + boIs(c, 23.)
+             + boIs(c, 28.) + boIs(c, 30.) + boIs(c, 31.);
+    d = min(d, sd > .5 ? boSegD(q, float2(0., 2.), float2(1., 2.)) : big);
+    // e (lower left)
+    float se = boIs(c, 0.) + boIs(c, 2.) + boIs(c, 6.) + boIs(c, 8.) + boIs(c, 20.) + boIs(c, 23.)
+             + boIs(c, 24.) + boIs(c, 25.) + boIs(c, 27.) + boIs(c, 28.) + boIs(c, 29.) + boIs(c, 30.) + boIs(c, 31.);
+    d = min(d, se > .5 ? boSegD(q, float2(0., 1.), float2(0., 2.)) : big);
+    // f (upper left)
+    float sf = boIs(c, 0.) + boIs(c, 4.) + boIs(c, 5.) + boIs(c, 6.) + boIs(c, 8.) + boIs(c, 9.)
+             + boIs(c, 20.) + boIs(c, 21.) + boIs(c, 23.) + boIs(c, 24.) + boIs(c, 25.) + boIs(c, 27.)
+             + boIs(c, 28.) + boIs(c, 29.) + boIs(c, 30.) + boIs(c, 31.);
+    d = min(d, sf > .5 ? boSegD(q, float2(0., 0.), float2(0., 1.)) : big);
+    // g (middle)
+    float sg = isDigit * (1. - boIs(c, 0.) - boIs(c, 1.) - boIs(c, 7.)) + boIs(c, 10.) + boIs(c, 11.)
+             + boIs(c, 21.) + boIs(c, 24.) + boIs(c, 25.) + boIs(c, 27.) + boIs(c, 29.) + boIs(c, 30.);
+    d = min(d, sg > .5 ? boSegD(q, float2(0., 1.), float2(1., 1.)) : big);
+    // M diagonals
+    float sm = boIs(c, 20.);
+    d = min(d, sm > .5 ? boSegD(q, float2(0., 0.), float2(.5, .9)) : big);
+    d = min(d, sm > .5 ? boSegD(q, float2(.5, .9), float2(1., 0.)) : big);
+    // centre vertical: 1, I, T
+    float sv = boIs(c, 1.) + boIs(c, 22.) + boIs(c, 26.);
+    d = min(d, sv > .5 ? boSegD(q, float2(.5, 0.), float2(.5, 2.)) : big);
+    // 1 flag
+    d = min(d, boIs(c, 1.) > .5 ? boSegD(q, float2(.5, 0.), float2(.15, .35)) : big);
+    // I serifs
+    float si = boIs(c, 22.);
+    d = min(d, si > .5 ? boSegD(q, float2(.2, 0.), float2(.8, 0.)) : big);
+    d = min(d, si > .5 ? boSegD(q, float2(.2, 2.), float2(.8, 2.)) : big);
+    // R leg
+    d = min(d, boIs(c, 24.) > .5 ? boSegD(q, float2(.35, 1.), float2(1., 2.)) : big);
+    // + vertical
+    d = min(d, boIs(c, 11.) > .5 ? boSegD(q, float2(.5, .55), float2(.5, 1.45)) : big);
+    // . dot
+    d = min(d, boIs(c, 12.) > .5 ? length(q - float2(.5, 1.95)) : big);
+    return d;
+}
+
+// coverage of character c in a cell whose top-left is at o, height hPx (width hPx / 2)
+float boChar(float2 fragPx, float2 o, float hPx, float c) {
+    float u = hPx / 2.;                                   // one cell unit in pixels
+    float2 q = (fragPx - o) / float2(u, u);
+    float inside = step(-.4, q.x) * step(q.x, 1.4) * step(-.4, q.y) * step(q.y, 2.4);
+    float w = max(.55, .09 * hPx);                        // stroke half-width in pixels
+    float dPx = boCharD(q, c) * u;
+    return inside * (1. - smoothstep(w - .6, w + .6, dPx));
+}
+
+// character k (0..4) of a value printed as [sign][tens][ones][.][tenths];
+// no value (<= -199) prints "--.-"; |v| >= 100 shows 99.9
+float boValueChar(float v, float k, float signed0) {
+    float none = step(v, -199.);
+    float a = min(abs(v), 99.94);
+    float t = floor(a * 10. + .5);
+    float tenths = t - 10. * floor(t / 10.);
+    float ones = floor(t / 10.) - 10. * floor(t / 100.);
+    float tens = floor(t / 100.);
+    float neg = step(v, -.05);
+    float pos = step(.05, v) * signed0;
+    float sign = neg > .5 ? 10. : (pos > .5 ? 11. : 13.);
+    float c = k < .5 ? sign : (k < 1.5 ? (tens > .5 ? tens : 13.) : (k < 2.5 ? ones : (k < 3.5 ? 12. : tenths)));
+    float cNone = k < .5 ? 13. : (k < 1.5 ? 10. : (k < 2.5 ? 10. : (k < 3.5 ? 12. : 10.)));
+    // move the sign next to the first digit when there are no tens
+    float shifted = (k < .5 && tens < .5) ? 13. : ((k > .5 && k < 1.5 && tens < .5) ? sign : c);
+    return none > .5 ? cNone : shifted;
+}

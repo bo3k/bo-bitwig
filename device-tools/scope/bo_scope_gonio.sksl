@@ -1,0 +1,94 @@
+// BO Scope: the goniometer's outline (mid up, side across) and the correlation.
+// audioLow: sectors 0..3   audioMedium: sectors 4..7   audioHigh: sectors 8..10, correlation (9: display off)
+// Sector k covers the angle k * pi / 11 .. (k + 1) * pi / 11 from +side (right) over mid (up) to -side;
+// its value is the largest radius sqrt(L^2 + R^2) seen there (1 = full scale, at the diagonals' ends),
+// fading out over 1 s. The cloud is point-symmetric: the lower half mirrors the upper one.
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+float boSec(float k) {
+    k = k < 0. ? k + 11. : (k > 10.5 ? k - 11. : k);
+    if (k < .5) return audioLow.x;
+    if (k < 1.5) return audioLow.y;
+    if (k < 2.5) return audioLow.z;
+    if (k < 3.5) return audioLow.w;
+    if (k < 4.5) return audioMedium.x;
+    if (k < 5.5) return audioMedium.y;
+    if (k < 6.5) return audioMedium.z;
+    if (k < 7.5) return audioMedium.w;
+    if (k < 8.5) return audioHigh.x;
+    if (k < 9.5) return audioHigh.y;
+    return audioHigh.z;
+}
+
+float boLine(float d, float w) {
+    return 1. - smoothstep(w * .5, w * .5 + 1., abs(d));
+}
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float boU = boRes.x / 128.;                 // 128 px wide at 100 %
+    float3 boCol = float3(.184, .184, .184);    // the analysers' face, as Master Bo's (47, 47, 47)
+    float3 boOrange = float3(1., .529, .075);
+    float3 boRed = float3(.92, .22, .16);
+    float boOff = step(8.5, audioHigh.w);
+    float boStrip = 22. * boU;                  // the correlation strip at the bottom
+    float boPlotH = boRes.y - boStrip;
+    float2 boC = float2(floor(boRes.x * .5) + .5, floor(boPlotH * .5) + .5);
+    float boR = min(boRes.x, boPlotH) * .5 - 6. * boU;
+    float2 boP = float2((fragCoord.x - boC.x) / boR, -(fragCoord.y - boC.y) / boR); // up is +mid
+    float boPx = 1. / boR;                      // one pixel in radius units
+    float boD = length(boP);
+    // the grid, as Master Bo's: the axes (mid, side) and the diagonals (L, R), faint
+    float boG = 0.;
+    float boInPlot = step(fragCoord.y, boPlotH);
+    float boInDisc = step(boD, 1.);
+    boG = max(boG, boLine(boP.x / boPx, 1.) * boInDisc);
+    boG = max(boG, boLine(boP.y / boPx, 1.) * boInDisc);
+    boG = max(boG, boLine((boP.x - boP.y) * .70710678 / boPx, 1.) * boInDisc);
+    boG = max(boG, boLine((boP.x + boP.y) * .70710678 / boPx, 1.) * boInDisc);
+    boCol = mix(boCol, float3(.27, .27, .27), boG * boInPlot);
+    if (boOff < .5) {
+        // the cloud: inside the outline (the sectors' radii, interpolated around the circle), orange
+        // specks as Master Bo's samples, denser towards the middle, drawn anew as the outline moves
+        float2 boQ = boP.y < 0. ? float2(-boP.x, -boP.y) : boP;
+        float boA = atan(boQ.y, boQ.x);         // 0 .. pi
+        float boK = boA * 11. / 3.14159265 - .5;
+        float boK0 = floor(boK);
+        float boF = boK - boK0;
+        boF = boF * boF * (3. - 2. * boF);
+        float boRad = min(mix(boSec(boK0), boSec(boK0 + 1.), boF), 1.1);
+        float boIn = (1. - smoothstep(boRad * .8, boRad * 1.08, boD)) * step(1e-3, boRad);
+        float boSeed = floor((audioLow.x + audioLow.y * 3. + audioMedium.y * 7. + audioMedium.z * 11. + audioHigh.y * 5.) * 400.);
+        float boCs = max(1., floor(boU + .5));
+        float boCx = floor(fragCoord.x / boCs), boCy = floor(fragCoord.y / boCs);
+        float boH1 = sin(boCx * 12.9898 + boCy * 78.233 + boSeed * .37) * 43758.5453;
+        boH1 = boH1 - floor(boH1);
+        float boH2 = sin(boCx * 39.3468 + boCy * 11.135 + boSeed * .71) * 24634.6345;
+        boH2 = boH2 - floor(boH2);
+        // as Master Bo's: a dense orange cloud, never past full scale (the diamond |x| + |y| <= 1)
+        boIn = boIn * step(abs(boP.x) + abs(boP.y), 1.);
+        float boDense = boIn * (.97 - .4 * smoothstep(0., max(boRad, 1e-4), boD));
+        float boSpeck = step(boH1, boDense) * step(.001, boDense) * (.55 + .45 * boH2);
+        float boGlow = max(boSpeck, boIn * .3);
+        boCol = mix(boCol, boOrange, boGlow * boInPlot);
+    }
+    // the correlation strip: a bar from -1 (left) to +1 (right), orange above 0, red below
+    float boSy = fragCoord.y - boPlotH;
+    float3 boStripCol = float3(.149, .149, .149);
+    float boX0 = 10. * boU, boX1 = boRes.x - 10. * boU;
+    float boMid = floor((boX0 + boX1) * .5);
+    float boBarY = boStrip * .5;
+    float boInBar = step(boX0, fragCoord.x) * step(fragCoord.x, boX1) * step(abs(boSy - boBarY), 2.5 * boU);
+    float3 boS = boStripCol;
+    boS = boInBar > .5 ? float3(.10, .10, .10) : boS;
+    float boCorr = clamp(audioHigh.w, -1., 1.);
+    float boAt = boMid + boCorr * (boX1 - boX0) * .5;
+    float boFilled = boInBar * step(min(boMid, boAt), fragCoord.x) * step(fragCoord.x, max(boMid, boAt)) * (1. - boOff);
+    boS = boFilled > .5 ? (boCorr < 0. ? boRed : boOrange) : boS;
+    float boTick = step(abs(fragCoord.x - boMid), .6) * step(abs(boSy - boBarY), 4.5 * boU);
+    boS = boTick > .5 ? float3(.45, .45, .45) : boS;
+    boCol = boInPlot > .5 ? boCol : boS;
+    return half4(half3(boCol), 1.);
+}

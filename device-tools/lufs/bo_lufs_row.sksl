@@ -1,0 +1,31 @@
+// BO LUFS: one readout row. Frame and background in the look of Bitwig's meters; the value is
+// drawn right-aligned before the unit label (Bitwig text, on top); it turns orange (S, I at or
+// above Reference) or red (TP at or above 0 dBTP).
+// audioLow: M, S, I, Reference   audioMedium: TP max (dBTP), heartbeat, 0, TP (last 100 ms)
+// The build fills in BO_VALUE, BO_KIND (0 plain, 1 reference, 2 clip), BO_RIGHT (fraction of the width).
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+BO_DIGITS
+
+half4 main(float2 boFragIn) {
+    // drawn 1 px (at 100 %) higher than its display: the field sits 1 px up
+    float2 fragCoord = float2(boFragIn.x, boFragIn.y + iResolution.xy.y / 20.);
+    if (boFragIn.y > iResolution.xy.y - iResolution.xy.y / 20.) return half4(half3(float3(.2706, .2706, .2706)), 1.);   // the row left free: the panel's grey
+    float2 boRes = iResolution.xy;
+    float boFrame = step(fragCoord.x, 1.) + step(boRes.x - 1., fragCoord.x) + step(fragCoord.y, 1.) + step(boRes.y - 1., fragCoord.y);
+    float3 boCol = boFrame > .5 ? float3(.102, .102, .102) : float3(.102, .102, .102);   // dark (26, 26, 26), as Master Bo's M S I TP fields
+    float v = BO_VALUE;
+    float kind = BO_KIND;
+    float h = floor(boRes.y * .5 + .5);
+    float y0 = floor((boRes.y - h) * .5);
+    float cov = boValue(fragCoord, v, boRes.x * BO_RIGHT, y0, h, kind > 1.5 ? 1. : 0.);
+    float hot = kind > .5 && kind < 1.5 && v > -70. && v >= audioLow.w ? 1. : 0.;
+    float clip = kind > 1.5 && v >= 0. ? 1. : 0.;
+    float3 txt = float3(.72, .72, .72);
+    txt = hot > .5 ? float3(1., .529, .075) : txt;
+    txt = clip > .5 ? float3(1., .15, .12) : txt;
+    boCol = mix(boCol, txt, cov);
+    return half4(half3(boCol), 1.);
+}
