@@ -26,7 +26,7 @@ The devices has to be download and installed.
 
 <img src="mods/save-incrementally/media/file-menu.png" alt="Save Incrementally in the File menu" width="260">
 
-Saves the project as its next numbered version: `Mix_009` becomes `Mix_010`, if the name doesn't and with a digit it will add one.
+Saves the project as its next numbered version: `Mix_009` becomes `Mix_010`, if the name doesn't end on a digit it will add one.
 
 **Download:** [save-incrementally.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/save-incrementally.zip)
 
