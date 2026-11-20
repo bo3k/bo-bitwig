@@ -12,7 +12,9 @@ Mods and devices for Bitwig Studio. They run with the Patchbay mod loader (BML) 
 
 ### [bo Master](mods/bo-master)
 
-The master track's strip beside Bitwig's browser: VU meter, loudness, spectrum, goniometer, fader, pan and the master's plug-ins.
+The master track's strip pinned on the right side, solo or beside Bitwig's browser: VU meter, loudness, spectrum, goniometer, fader, pan and the master's plug-ins.
+Master is always visible, also in Edit or Arranger view. It supports the Insert FX handling, Track Remotes and display of the dedicated bwdevices for metering.
+The devices has to be download and installed.
 
 **Download:** [bo-master.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master.zip) and [panels-framework.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/panels-framework.zip) (needed). Its meters come from the devices [bo LUFS](devices/bo-lufs), [bo Spectrum](devices/bo-spectrum) and [bo Scope](devices/bo-scope).
 
@@ -20,7 +22,7 @@ The master track's strip beside Bitwig's browser: VU meter, loudness, spectrum, 
 
 <img src="mods/save-incrementally/media/file-menu.png" alt="Save Incrementally in the File menu" width="260">
 
-Saves the project as its next numbered version: `Mix_009` becomes `Mix_010`.
+Saves the project as its next numbered version: `Mix_009` becomes `Mix_010`, if the name doesn't and with a digit it will add one.
 
 **Download:** [save-incrementally.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/save-incrementally.zip)
 
@@ -28,7 +30,7 @@ Saves the project as its next numbered version: `Mix_009` becomes `Mix_010`.
 
 <img src="mods/insert-device-via-shortcut/media/shortcuts.png" alt="The Insert Device actions in Settings > Shortcuts" width="520">
 
-A shortcut for every Bitwig effect and instrument, plus Tool, Chain and Pro-Q 4. You choose the keys.
+A shortcut for every Bitwig effect and instrument. You choose the keys.
 
 **Download:** [insert-device-via-shortcut.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/insert-device-via-shortcut.zip)
 
