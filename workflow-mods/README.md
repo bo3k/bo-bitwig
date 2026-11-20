@@ -7,6 +7,8 @@
 
 ![Save Incrementally in Bitwig's File menu](save-incrementally/media/file-menu.png)
 
+![The Insert Device: Audio FX actions in Settings > Shortcuts](insert-device-via-shortcut/media/shortcuts.png)
+
 Both need **Framework: Actions and Menus** (`action-menu-composition-framework`) 0.7.0-dev.1 or later, which ships with BML.
 
 No action has a key of its own; assign them in **Settings > Shortcuts**. The actions keep the IDs of BO Tools, the mod they were first in, so keys assigned there still work. Don't tick BO Tools together with these two.

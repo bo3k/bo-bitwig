@@ -6,6 +6,8 @@ Actions that insert a device on the current track (the one whose devices the dev
 - **Insert [device]** for every other Bitwig audio effect (68) and every Bitwig instrument (44, drum voices included).
 - Left out: Note FX, MIDI devices, the legacy MOD devices, and HW CV Out / HW Clock Out.
 
+![The Insert Device: Audio FX actions in Settings > Shortcuts](media/shortcuts.png)
+
 The device goes after the track's selected device, inside a container when that device is in one. With no device selected, it goes at the end of the track's chain. One undo step.
 
 ## Keys
