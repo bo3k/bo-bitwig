@@ -2,6 +2,13 @@
 
 A panel with the master track's strip: VU, LUFS, fader, pan, peak and RMS meters, inserts, spectrum and goniometer. It is a column of its own, left of the browser side, shown and hidden by its button next to the keyboard's in the bottom bar.
 
+<p>
+  <img src="mod/media/bo-master-panel.png" alt="bo Master beside the master strip of Bitwig's mixer" height="640">
+  <img src="mod/media/bo-master-open.gif" alt="Showing bo Master with its button in the bottom bar" height="640">
+</p>
+
+Left: bo Master (right) beside the master strip of Bitwig's mixer. Right: showing and hiding it with its button in the bottom bar.
+
 ![bo Scope, bo Spectrum, bo LUFS and bo Safety on the master track](devices/media/master-fx-devices.png)
 
 bo Master's meter devices on the master track: bo Scope, bo Spectrum and bo LUFS, with bo Safety last in the chain ([`devices/bo-safety`](../devices/bo-safety)).

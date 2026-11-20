@@ -4,6 +4,8 @@ For Bitwig 6.1.4 (Windows x64). Needs **Framework: Panels** 0.2.0-dev.2.bo.2 or 
 
 A panel with the master track's strip: a VU meter, fader, pan, peak and RMS meters with peak hold, and the master's inserts with their windows.
 
+![bo Master beside the master strip of Bitwig's mixer](media/bo-master-panel.png)
+
 ## Where it appears
 
 bo Master is a tab of the **browser side**, the right-hand panel with the Browser, Project, Studio I/O and Mappings tabs. Its tab comes first, and its button sits first in that group of the bottom bar, before the Browser's. The side still opens on the Browser by default:
