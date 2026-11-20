@@ -310,7 +310,7 @@ final class MasterBoWidget extends dve implements drv {
         int n = model.macros.size();
         int cols = low ? 1 : (macrosW >= eLY(200) ? 2 : 1);
         double row = eLY(MACRO_ROW), colW = (macrosW - (cols - 1) * eLY(4)) / cols;
-        iok control = iok.cfM(69, 69, 69);
+        iok control = themeGrey("Grey 4", 61, "Grey 5", 73, 8 / 12.0); // 69 in the default theme
         for (int i = 0; i < n; i++) {
             int c = i % cols, rr = i / cols;
             double x = macrosX + c * (colW + eLY(4)), y = macrosY + titleH + rr * row;
@@ -334,8 +334,8 @@ final class MasterBoWidget extends dve implements drv {
                 g.Hnt(text.cfM(0.6F)); g.wGc();
             } else { // a knob as Bitwig's: a dark disc, a grey ring with the value as an orange arc, a light pointer
                 double r = eLY(11), kx = cx0 + cw / 2;
-                g.MRY(kx, cy, r - eLY(2)); g.Hnt(iok.cfM(81, 81, 81)); g.wGc(); // the buttons' grey
-                arc(g, kx, cy, r, 0, 1, iok.cfM(56, 56, 56), Math.max(2.0, 2.5 * eLY(1)));
+                g.MRY(kx, cy, r - eLY(2)); g.Hnt(themeGrey("Grey 5", 73, "Grey 6", 90, 8 / 17.0)); g.wGc(); // the buttons' grey (81 in the default theme)
+                arc(g, kx, cy, r, 0, 1, themeGrey("Grey 3", 50, "Grey 4", 61, 6 / 11.0), Math.max(2.0, 2.5 * eLY(1))); // 56
                 arc(g, kx, cy, r, 0, m.norm, orange, Math.max(2.0, 2.5 * eLY(1)));
                 double ang = Math.toRadians(225 - 270 * m.norm);
                 line(g, kx, cy, kx + Math.cos(ang) * r * 0.7, cy - Math.sin(ang) * r * 0.7, text.cfM(0.9F), Math.max(1.0, 1.5 * eLY(1)));
@@ -405,25 +405,25 @@ final class MasterBoWidget extends dve implements drv {
         double sa = small.cfM().cfM();
         g.cfM(small);
         double h = popupNames.length * popupItemH + eLY(4);
-        rect(g, popupX - 1, popupY - 1, popupW + 2, h + 2, iok.cfM(90, 90, 90));   // its edge
-        rect(g, popupX, popupY, popupW, h, iok.cfM(38, 38, 38));
+        rect(g, popupX - 1, popupY - 1, popupW + 2, h + 2, theme("Grey 6", iok.cfM(90, 90, 90)));   // its edge
+        rect(g, popupX, popupY, popupW, h, theme("Grey 2", iok.cfM(38, 38, 38)));
         int current = (int) Math.round(m.norm * Math.max(1, popupNames.length - 1));
         iok orange = theme("Accent (default)", ACCENT);
         for (int i = 0; i < popupNames.length; i++) {
             double y = popupY + eLY(2) + i * popupItemH;
-            if (i == popupHover) rect(g, popupX, y, popupW, popupItemH, iok.cfM(70, 70, 70)); // under the pointer (the current value: orange)
+            if (i == popupHover) rect(g, popupX, y, popupW, popupItemH, themeGrey("Grey 4", 61, "Grey 5", 73, 9 / 12.0)); // (70) under the pointer (the current value: orange)
             text(g, small, popupX + eLY(8), y + (popupItemH + sa) / 2 - 1, popupNames[i], i == current ? orange : text);
         }
         g.cfM(font);
     }
 
-    /** Bitwig's button face: a grey from 85 at the top to 77 at the bottom. */
+    /** Bitwig's button face: a grey from 85 at the top to 77 at the bottom (in the default theme; between its Grey 5 and Grey 6). */
     private void bitwigFace(SYo g, double x, double y, double w, double h) {
         x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
         int bands = (int) Math.max(1, h);
+        iok top = themeGrey("Grey 5", 73, "Grey 6", 90, 12 / 17.0), bottom = themeGrey("Grey 5", 73, "Grey 6", 90, 4 / 17.0);
         for (int k = 0; k < bands; k++) {
-            int v = (int) Math.round(85 - 8.0 * k / Math.max(1, bands - 1));
-            rect(g, x, y + k, w, 1, iok.cfM(v, v, v));
+            rect(g, x, y + k, w, 1, top.cfM(bottom, (float) (k / (double) Math.max(1, bands - 1)))); // cfM(iok, t): mixed
         }
     }
 
@@ -508,9 +508,9 @@ final class MasterBoWidget extends dve implements drv {
 
     private double[] gonioMoveHit;
 
-    /** The spectrum's and the goniometer's face: (47, 47, 47), as on BO Spectrum's and BO Scope's panels (the VU's schemes leave it alone). */
+    /** The spectrum's and the goniometer's face: (47, 47, 47) in the default theme, as on bo Spectrum's and bo Scope's panels (the VU's schemes leave it alone). */
     private iok analysisFace() {
-        return iok.cfM(47, 47, 47); // a mid-dark grey (as BO Spectrum's and BO Scope's panels), whatever the VU's scheme
+        return themeGrey("Grey 2", 38, "Grey 3", 50, 9 / 12.0); // a mid-dark grey, whatever the VU's scheme
     }
 
     /**
@@ -1330,7 +1330,7 @@ final class MasterBoWidget extends dve implements drv {
         iok red = theme("Meter Clipping", RED);
         for (int i = 0; i < 4; i++) {
             double x = lufsX + i * (cw + gap);
-            rect(g, x, lufsY, cw, lufsH, iok.cfM(26, 26, 26)); // dark, as the fader's background
+            rect(g, x, lufsY, cw, lufsH, theme("Grey 1", iok.cfM(26, 26, 26))); // dark, as the fader's background
             double v = model.lufs[i];
             String label = labels[i];
             g.cfM(x + (cw - font.cfM(label).IwV()) / 2, lufsY + eLY(3) + ascent, label, text.cfM(0.45F));
@@ -1439,7 +1439,7 @@ final class MasterBoWidget extends dve implements drv {
 
     private void paintInserts(SYo g, Hpk font, iok text, double ascent) {
         double row = eLY(ROW);
-        iok slot = iok.cfM(69, 69, 69); // each FX slot, as Bitwig's mixer has them (1 px of the background between)
+        iok slot = themeGrey("Grey 4", 61, "Grey 5", 73, 8 / 12.0); // (69) each FX slot, as Bitwig's mixer has them (1 px of the background between)
         List<MasterBoModel.Insert> inserts = model.inserts;
         if (inserts.isEmpty()) {
             if (insertsH >= row) rect(g, insertsX, insertsY, insertsW, row - 1, slot);
@@ -1712,7 +1712,7 @@ final class MasterBoWidget extends dve implements drv {
         for (int k = 0; k < 2; k++) {
             boolean on = k == 0 ? model.soloOn : model.muteOn;
             double x = left + k * (bw + gap);
-            rect(g, x, top, bw, bh, on ? (k == 0 ? yellow : orange) : iok.cfM(69, 69, 69)); // off: the FX slots' grey
+            rect(g, x, top, bw, bh, on ? (k == 0 ? yellow : orange) : themeGrey("Grey 4", 61, "Grey 5", 73, 8 / 12.0)); // off: the FX slots' grey
             String letter = k == 0 ? "S" : "M";
             double lw = small.cfM(letter).IwV();
             iok ink = on ? iok.cfM(20, 20, 20) : text.cfM(0.85F);
@@ -1760,15 +1760,15 @@ final class MasterBoWidget extends dve implements drv {
      */
     private void paintLowerBackground(SYo g) {
         double top = bigH > 0 ? bigY + bigH + eLY(3) : headerY + eLY(HEADER) + eLY(3);
-        rect(g, 0, Math.round(top), Sxo(), yiX() - Math.round(top), iok.cfM(35, 35, 35));
+        rect(g, 0, Math.round(top), Sxo(), yiX() - Math.round(top), themeGrey("Grey 1", 26, "Grey 2", 38, 9 / 12.0)); // 35 in the default theme
         double faderRight = faderX + eLY(FADER_WIDTH);
         if (!(stripGroupX >= panX - 1 && faderRight <= panX + panW + 1)) return; // the strip is not under the pan
         double m = eLY(4);
         double l = Math.round(Math.min(panX, stripGroupX) - m), r = Math.round(Math.max(panX + panW, faderRight) + m);
         double t = Math.round(panY - eLY(16) - m);
-        rect(g, l, t, r - l, yiX() - t - eLY(2), iok.cfM(26, 26, 26));
+        rect(g, l, t, r - l, yiX() - t - eLY(2), theme("Grey 1", iok.cfM(26, 26, 26)));
         // cut into three, as Bitwig's mixer: the pan | the readouts | the meters and the fader
-        iok cut = iok.cfM(35, 35, 35);
+        iok cut = themeGrey("Grey 1", 26, "Grey 2", 38, 9 / 12.0);
         double panBottom = panY + eLY(PAN_HEIGHT);
         double gapY = Math.round((panBottom + stripY) / 2 - 1.5);
         rect(g, l, gapY, r - l, 3, cut);
@@ -1914,6 +1914,14 @@ final class MasterBoWidget extends dve implements drv {
     }
 
     /** One of the theme's colours by its name, as the theme defines them (Bitwig's own, so a custom theme follows). */
+    /**
+     * A grey between two of the theme's greys (t: 0 the first, 1 the second), so it follows the theme
+     * as Bitwig's own greys do; av and bv are their values in the default theme, used if the theme lacks them.
+     */
+    private iok themeGrey(String a, int av, String b, int bv, double t) {
+        return theme(a, iok.cfM(av, av, av)).cfM(theme(b, iok.cfM(bv, bv, bv)), (float) t); // cfM(iok, t): mixed
+    }
+
     private iok theme(String name, iok fallback) {
         try {
             eeY colour = jl_().BAa().cfM(name); // jl_(): the theme; BAa(): its colours; cfM: by name

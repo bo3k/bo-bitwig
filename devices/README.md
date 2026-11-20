@@ -13,5 +13,5 @@ The `.bwdevice` files are ready to use: put them in a folder listed in BML's **D
 
 ## Rebuilding
 
-- **bo Curve:** `python build_bo_sat.py` writes `out/bo Curve.bwdevice`, the same file as the one here. The Vintage skin's images are made from the renders in `satv5/` with `python make_sat_background.py satv5`.
+- **bo Curve:** `python build_bo_sat.py` writes `out/bo Curve.bwdevice`; `python ../../tools/device-gen/theme_greys.py curve "out/bo Curve.bwdevice" "bo Curve.bwdevice"` then gives the file here (its Bitwig skin in the theme's greys). The Vintage skin's images are made from the renders in `satv5/` with `python make_sat_background.py satv5`.
 - **bo Safety:** `build_bo_safety_limiter.py` needs a newer device generator than `tools/device-gen/bwgen.py`, as bo Master's devices do. The `.bwdevice` here is the current build.

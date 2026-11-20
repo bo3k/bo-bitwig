@@ -91,3 +91,7 @@ Path("out/My Device.bwdevice").write_bytes(dev.build())
 - Nitro built-ins (from `com/bitwig/nitro/CallExpression`): acos asin atan cbrt ceil cos cosh exp
   exp10 exp2 floor fmax fmin fmod hypot log log10 log2 pow round sin sinh sqrt tan tanh.
   Seen in working devices: exp, log, pow, sqrt, fmin, fmax, fabs, floor, sin, cos, log10.
+
+## Theme greys
+
+`theme_greys.py <device> <in> <out>` makes a built device's greys follow Bitwig's theme (devices: `lufs`, `spectrum`, `scope`, `safety`, `curve`, `magnetic`). A drawing can't read the theme, so each grey is drawn as black or white over what Bitwig draws under it; in the default theme it looks exactly as before. Hidden reset buttons become borderless, and bo Curve's Bitwig skin gets its own themed graph. Run it on a fresh build: the `.bwdevice` files in this repo are already patched.
