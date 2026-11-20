@@ -40,8 +40,8 @@ A shortcut for every Bitwig effect and instrument. You choose the keys.
 
 | Device | What it does | Download |
 |---|---|---|
-| [bo Curve](devices/bo-curve) | Saturator with three skins | [bo-Curve.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Curve.bwdevice) |
-| [bo Safety](devices/bo-safety) | Protects speakers and ears from sudden loud peaks | [bo-Safety.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Safety.bwdevice) |
+| [bo Curve](devices/bo-curve) | 1st modding test, a custom saturator with three characteristics. It also has three skins | [bo-Curve.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Curve.bwdevice) |
+| [bo Safety](devices/bo-safety) | Safety limiter for the master. Protects speakers and ears from sudden loud peaks | [bo-Safety.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Safety.bwdevice) |
 | [bo LUFS](devices/bo-lufs) | Loudness meter: momentary, short-term, integrated, true peak | [bo-LUFS.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-LUFS.bwdevice) |
 | [bo Spectrum](devices/bo-spectrum) | 31-band spectrum | [bo-Spectrum.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Spectrum.bwdevice) |
 | [bo Scope](devices/bo-scope) | Goniometer and correlation meter | [bo-Scope.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Scope.bwdevice) |
