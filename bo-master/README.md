@@ -2,6 +2,10 @@
 
 A panel with the master track's strip: VU, LUFS, fader, pan, peak and RMS meters, inserts, spectrum and goniometer. It is a column of its own, left of the browser side, shown and hidden by its button next to the keyboard's in the bottom bar.
 
+![bo Scope, bo Spectrum, bo LUFS and bo Safety on the master track](devices/media/master-fx-devices.png)
+
+bo Master's meter devices on the master track: bo Scope, bo Spectrum and bo LUFS, with bo Safety last in the chain ([`devices/bo-safety`](../devices/bo-safety)).
+
 | Folder | What |
 |---|---|
 | `mod/` | The bo Master mod (`master-bo`, 0.1.0-dev.71). |

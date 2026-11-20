@@ -5,6 +5,8 @@
 | [`bo-curve/`](bo-curve) | **bo Curve** (formerly BO Sat): a saturator with Curve, Asym, Drive, Tone, Mix, Output, Link, three modes (smooth, triode, bitcrush) and three skins (Bitwig, Modern, Vintage). |
 | [`bo-safety/`](bo-safety) | **bo Safety**: a speaker and hearing protection limiter with Limit (-18 to +10 dB) and TP Margin. |
 
+![bo Safety](bo-safety/media/bo-safety.png)
+
 The `.bwdevice` files are ready to use: put them in a folder listed in BML's **Device Folders** (Framework: Nitro Devices).
 
 ## Rebuilding
