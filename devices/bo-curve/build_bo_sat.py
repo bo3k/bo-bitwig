@@ -523,9 +523,9 @@ def bo_sat_test() -> Device:
         nitro=with_oversampling((HERE / "bo_sat.nitro").read_text()),
         description="Saturator: Drive (clean at 0), Output, Curve (soft to hard), Asym, Tone (180 Hz pre/de-emphasis), Mix, Link",
         tags="saturation distortion clipper drive tone asymmetry",
-        panel_size=(89, 55),                         # width from the vintage panel image (89 x 53)                         # 53 = standard Bitwig device height
+        panel_size=(89, 53),                         # the vintage panel image (89 x 53); 53 = standard Bitwig device height
     )
-    # Layout (grid units, 1 unit = 4 px), panel 102 x 55 (the vintage image is 102 x 53); 5 units margin round the knobs:
+    # Layout (grid units, 1 unit = 4 px), panel 89 x 53, the same as the vintage image; 5 units margin round the knobs:
     # the positions of the vintage panel (satv3):
     #   Curve  Tone  |   < Mode >
     #   Asym   Mix   |    graph (in the chart)
