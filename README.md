@@ -1,47 +1,59 @@
 # bo-bitwig
 
-Bo's mods and native devices for Bitwig Studio, run with the Patchbay mod loader (BML). For Bitwig 6.1.4 and 6.1.7, Windows x64, with BML 0.36.0-dev.13.
+Mods and devices for Bitwig Studio. They run with the Patchbay mod loader (BML) on Bitwig 6.1.4 and 6.1.7 for Windows.
 
-| Folder | What |
-|---|---|
-| [`bo-master/`](bo-master) | **bo Master**: a panel with the master track's strip, VU, LUFS, spectrum and goniometer. Its meter devices (bo LUFS, bo Spectrum, bo Scope), and the build of Framework: Panels it needs. |
-| [`workflow-mods/`](workflow-mods) | **Save Incrementally** (File menu) and **Insert Device via Shortcut**. |
-| [`devices/`](devices) | Stand-alone devices: **bo Curve** (saturator) and **bo Safety** (speaker and hearing protection limiter). |
-| [`tools/`](tools) | Shared build tools: `mod-build` for the mods, `device-gen` for the devices. |
-
-## Install
-
-Ready-made builds are on the [Releases](https://github.com/bo3k/bo-bitwig/releases) page.
-
-- **Mods:** each mod is a Patchbay-ready ZIP. In BML, open the Mods page and use **Add Mod…** (Ctrl+O), or drop the ZIPs on the window, then tick the mods. Several ZIPs can be added at once. Needs BML 0.36.0-dev.13 or later.
-- **Devices:** unpack the device ZIP into a folder of your choice and add that folder in **Tools > Device Folders**.
-
-| Release | Contents |
-|---|---|
-| bo Master | `master-bo` and `panel-management-framework` (Bo's build, replaces the stock one) mod ZIPs, and `bo-master-devices.zip` (bo LUFS, bo Spectrum, bo Scope). Install all three. |
-| Workflow mods | `save-incrementally` and `insert-device-via-shortcut` mod ZIPs. |
-| Devices | `bo-curve-and-safety.zip` (bo Curve, bo Safety). |
+<p>
+  <img src="mods/bo-master/media/bo-master-panel.png" alt="bo Master" height="520">
+  &nbsp;
+  <img src="devices/bo-curve/media/bo-curve.gif" alt="bo Curve" width="420">
+</p>
 
 ## Mods
 
-Mods are built from source with `tools/mod-build`: JDK 21 stand-ins for the BML mod kit.
+### [bo Master](mods/bo-master)
 
-- `CompileJar` makes compile-only stubs from your installed `bitwig.jar`. The stubs and the jar stay on your machine; `.gitignore` keeps them out.
-- `Finish` rewrites the stub package and lists the `opens` a mod needs.
-- `build-mod.sh` assembles the mod folder.
+The master track's strip beside Bitwig's browser: VU meter, loudness, spectrum, goniometer, fader, pan and the master's plug-ins.
 
-Copy each built mod folder into `BML-…\mods\` (or zip it with the folder at the top and use Add Mod…) and tick it in BML. BML translates mods built against 6.1.4 to 6.1.7 itself.
+**Download:** [bo-master.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master.zip) and [panels-framework.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/panels-framework.zip) (needed). Its meters come from the devices [bo LUFS](devices/bo-lufs), [bo Spectrum](devices/bo-spectrum) and [bo Scope](devices/bo-scope).
+
+### [Save Incrementally](mods/save-incrementally)
+
+<img src="mods/save-incrementally/media/file-menu.png" alt="Save Incrementally in the File menu" width="260">
+
+Saves the project as its next numbered version: `Mix_009` becomes `Mix_010`.
+
+**Download:** [save-incrementally.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/save-incrementally.zip)
+
+### [Insert Device via Shortcut](mods/insert-device-via-shortcut)
+
+<img src="mods/insert-device-via-shortcut/media/shortcuts.png" alt="The Insert Device actions in Settings > Shortcuts" width="520">
+
+A shortcut for every Bitwig effect and instrument, plus Tool, Chain and Pro-Q 4. You choose the keys.
+
+**Download:** [insert-device-via-shortcut.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/insert-device-via-shortcut.zip)
 
 ## Devices
 
-The `.bwdevice` files are ready to use: put them in a folder listed in BML's **Device Folders** (Framework: Nitro Devices).
+![bo Scope, bo Spectrum, bo LUFS and bo Safety](devices/media/master-fx-devices.png)
 
-Each device stores its DSP as Nitro source in Bitwig's own syntax, and Bitwig compiles it when it loads the device. Bitwig 6.1.7 changed the precompiled form, so a precompiled device from one version doesn't load in the other; source loads in both.
+| Device | What it does | Download |
+|---|---|---|
+| [bo Curve](devices/bo-curve) | Saturator with three skins | [bo-Curve.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Curve.bwdevice) |
+| [bo Safety](devices/bo-safety) | Protects speakers and ears from sudden loud peaks | [bo-Safety.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Safety.bwdevice) |
+| [bo LUFS](devices/bo-lufs) | Loudness meter: momentary, short-term, integrated, true peak | [bo-LUFS.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-LUFS.bwdevice) |
+| [bo Spectrum](devices/bo-spectrum) | 31-band spectrum | [bo-Spectrum.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Spectrum.bwdevice) |
+| [bo Scope](devices/bo-scope) | Goniometer and correlation meter | [bo-Scope.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Scope.bwdevice) |
 
-To rebuild a device, use the `build_*.py` script next to it: Python 3.10+, and [bitwig-nitro-tools](https://github.com/blakebratcher/bitwig-nitro-tools) installed with `pip install -e .` or named in `BITWIG_NITRO_TOOLS`. Some scripts need a newer generator than the one in `tools/device-gen`; each folder's README says which.
+**All five in one:** [bo-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-devices.zip)
 
-## Not in this repo
+## Install
 
-- Bitwig's files: `bitwig.jar`, stubs or classes made from it, and Bitwig's own resources.
-- BML and its frameworks, apart from the Panels build bo Master needs, and other people's mods.
-- bo Magnetic.
+1. **Patchbay (BML)** 0.36.0-dev.13 or later.
+2. **Mods:** on Patchbay's Mods page, click **Add Mod…** (or drop the zips on its window), then tick the mods.
+3. **Devices:** put the `.bwdevice` files in a folder and add that folder under **Tools > Device Folders** in Patchbay.
+
+All downloads are also on the [Releases](https://github.com/bo3k/bo-bitwig/releases) page.
+
+---
+
+Building from source: [BUILDING.md](BUILDING.md). The Panels framework is by shaboogen, under the MIT licence.

@@ -19,8 +19,6 @@ No action has a key of its own, so the mod never conflicts with your shortcuts o
 
 Type "Insert" in the search to find them. They are in the Commander too.
 
-The action IDs are the ones from BO Tools, the mod these actions were first in, so keys assigned there still work. Don't run BO Tools at the same time.
-
 ## Pro-Q 4
 
 - **VST3:** found by its VST3 ID (`ED57BD725C60467EA64DD2F400758B6F`), which is the same on every computer.

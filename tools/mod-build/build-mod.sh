@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds a BML mod (no @Hook mods only) with JDK 21, standing in for bml-modkit (which needs JDK 25).
+# Builds a BML mod (hooks written in its mod.json are kept; no @Hook annotations) with JDK 21, standing in for bml-modkit (which needs JDK 25).
 #   build-mod.sh <mod source folder> [framework-id ...]
 # Output: out/<mod-id>/ (installable folder, with src/, build.json, uses.tsv, SHA256SUMS.txt)
 #         out/<mod-id>-<version>.zip
@@ -24,7 +24,7 @@ python3 - "$MOD/mod.json" "$WORK/hooks.json" "$OUT/mod.json" <<'PY'
 import json, re, sys
 src, hooks, out = sys.argv[1:4]
 m = json.load(open(src)); h = json.load(open(hooks))
-targets = {}; opens = []
+targets = dict(m.get("targets", {})); opens = []   # targets and hooks written in the source mod.json are kept
 def tid(t):
     for k, v in targets.items():
         if v == t: return k
@@ -35,7 +35,7 @@ def tid(t):
     targets[k] = t; return k
 for a in h["access"]: opens.append(tid(a))
 res = {"manifest_version": m["manifest_version"], "mod": m["mod"], "built_against": m["built_against"],
-       "targets": targets, "hooks": []}
+       "targets": targets, "hooks": list(m.get("hooks", []))}
 if opens: res["opens"] = sorted(opens)
 for k, v in m.items():
     if k not in res: res[k] = v
@@ -43,6 +43,7 @@ json.dump(res, open(out, "w"), indent=2); open(out, "a").write("\n")
 PY
 cp "$MOD/README.md" "$OUT/"
 [ -d "$MOD/images" ] && [ -n "$(ls -A "$MOD/images")" ] && cp -r "$MOD/images" "$OUT/"
+if [ -d "$MOD/media" ]; then mkdir -p "$OUT/media"; for f in "$MOD"/media/*.png "$MOD"/media/*.gif "$MOD"/media/*.jpg; do [ -f "$f" ] && cp "$f" "$OUT/media/"; done; fi
 cp -r "$MOD/package/." "$OUT/"
 cp -r "$MOD/src" "$OUT/"; cp "$MOD/build.json" "$OUT/"; cp "$WORK/uses.tsv" "$OUT/"
 (cd "$OUT" && for f in README.md helper.jar mod.json $(cd "$MOD/package" && find . -type f | sed 's#^\./##' | sort) uses.tsv; do sha256sum "$f"; done > SHA256SUMS.txt)

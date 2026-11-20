@@ -11,7 +11,7 @@ It saves the project as a new file in the same folder:
 
 A name that is already taken is skipped. The project continues under the new file, as with Save As. A project that was never saved opens Bitwig's Save dialog.
 
-It is also an action in the **File** category of Settings > Shortcuts, where you can give it a key. Its ID is the one from BO Tools, so a key assigned there still works. Don't run BO Tools at the same time.
+It is also an action in the **File** category of Settings > Shortcuts, where you can give it a key.
 
 ## Requirements
 
