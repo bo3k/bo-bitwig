@@ -1511,6 +1511,32 @@ final class MasterBoModel {
         }
     }
 
+    /**
+     * Deletes the insert selected from bo Master, as Bitwig's own Delete does in the device panel:
+     * the master's device selection holds only it and deletes its content (one undo step). False
+     * when nothing is selected, the device is no longer in the chain, or the selection can't delete it.
+     */
+    boolean deleteSelectedInsert() {
+        jsd device = selectedInsert;
+        if (master == null || device == null) return false;
+        Insert insert = find(device);
+        if (insert == null) { selectedInsert = null; debug("delete: the selected insert is gone"); return false; }
+        try {
+            bitwig.obf.bid devices = window.Mph().cfM(master.tp2()); // the master's device selection, as in selectInsert
+            if (devices == null) { debug("delete: no selection"); return false; }
+            devices.MRY(device);                // select only this
+            if (!devices.zpW()) { debug("delete: the selection can't delete " + insert.name); return false; } // zpW(): can delete
+            devices.TD2();                      // TD2(): delete, what Bitwig's Delete action runs on a selection
+            selectedInsert = null;
+            debug("delete: " + insert.name);
+            return true;
+        } catch (Throwable failure) {
+            debug("delete failed: " + failure);
+            MasterBoPanels.MOD.log("Master Bo could not delete an insert", failure);
+            return false;
+        }
+    }
+
     /** Resets BO LUFS (integrated, maxima, true peak) as a click on its own panel does: its trigger's "click". */
     void resetLufs() {
         oDc trigger = lufsTrigger;

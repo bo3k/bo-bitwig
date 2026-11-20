@@ -18,6 +18,10 @@ import bitwig.obf.drv; // told when the UI scale around a widget changes
 import bitwig.obf.duG; // a window
 import bitwig.obf.eeY; // a theme colour
 import bitwig.obf.eoV; // a set of held modifier keys
+import bitwig.obf.eoR; // a key press
+import bitwig.obf.eoO; // a key
+import bitwig.obf.eoU; // Bitwig's keys (Backspace, Delete, ...)
+import bitwig.obf.dsg; // the root of a window's widgets (it knows the keyboard focus)
 import bitwig.obf.eoW; // a mouse button
 import bitwig.obf.iok; // a colour
 import com.bitwig.graphics.BrJ; // a loaded icon
@@ -1458,7 +1462,7 @@ final class MasterBoWidget extends dve implements drv {
             g.cfM(nameX, top + (row + ascent) / 2 - 1, name, insert.enabled ? text : text.cfM(0.4F));
             if (insert.plugin) paintWindowButton(g, text, insertsX + insertsW - eLY(WINDOW_BUTTON), top, eLY(WINDOW_BUTTON), row, insert.windowOpen);
             if (i == dragFrom) rect(g, insertsX, top, insertsW, row, text.cfM(0.08F)); // the row being dragged
-            if (insert.device == model.selectedInsert) { // selected: Bitwig's selection look (a light fill and an orange edge)
+            if (insert.device == model.selectedInsert && hasKeyboard()) { // selected (while Delete reaches it): Bitwig's selection look (a light fill and an orange edge)
                 rect(g, insertsX, top, insertsW, row, text.cfM(0.10F));
                 rect(g, insertsX, top, eLY(2), row, theme("Accent (default)", ACCENT));
             }
@@ -1957,6 +1961,58 @@ final class MasterBoWidget extends dve implements drv {
         return n == 0 ? "" : s.substring(0, n) + dots;
     }
 
+    // ---------- Keyboard ----------
+
+    /** Takes the keyboard (as a click on a text field does), so the next key press comes here first. */
+    private void takeKeyboard() {
+        try {
+            ju_(); // ju_(): ask the window for the keyboard focus
+            MasterBoModel.debug("keyboard: " + (hasKeyboard() ? "taken" : "not taken"));
+        } catch (Throwable failure) {
+            MasterBoModel.debug("keyboard failed: " + failure);
+        }
+    }
+
+    /** Whether key presses come to bo Master first (it has the window's keyboard focus). */
+    private boolean hasKeyboard() {
+        try {
+            dsg root = kN_(); // kN_(): the root of this widget's window
+            return root != null && root.QSH() == this; // QSH(): the widget with the keyboard focus
+        } catch (Throwable failure) {
+            return false;
+        }
+    }
+
+    /**
+     * A key press while bo Master has the keyboard: Delete or Backspace (no modifier) deletes the
+     * selected insert, as in Bitwig's device panel. Every other key goes on to Bitwig's shortcuts.
+     */
+    @Override
+    public boolean MRY(eoR press) {
+        try {
+            if (model.selectedInsert != null && isDeleteKey(press)) {
+                boolean deleted = model.deleteSelectedInsert();
+                model.refresh();
+                jbi();
+                if (deleted) return true;
+            }
+        } catch (Throwable failure) {
+            MasterBoPanels.MOD.log("Master Bo could not handle a key", failure);
+        }
+        return super.MRY(press);
+    }
+
+    private static boolean isDeleteKey(eoR press) {
+        eoV mods = press.TtY(); // TtY(): the modifiers held
+        if (mods != null && !mods.equals(eoV.Hnt)) return false; // eoV.Hnt: none
+        return isDelete(press.IwV()) || isDelete(press.wGc()); // the key, as typed and as on the keyboard
+    }
+
+    private static boolean isDelete(eoO key) {
+        // eoU.BAa: Backspace, eoU.Ai: Delete, eoU.bB: Numpad Delete
+        return key != null && (key == eoU.BAa || key == eoU.Ai || key == eoU.bB);
+    }
+
     // ---------- Mouse ----------
 
     private boolean in(double x, double y, double rx, double ry, double rw, double rh) {
@@ -1971,7 +2027,6 @@ final class MasterBoWidget extends dve implements drv {
     @Override
     public drX MRY(eoW button, double x, double y, eoV mods, int clicks) {
         if (button != eoW.cfM) return null; // eoW.cfM: the main button
-        if (!in(x, y, insertsX, insertsY, insertsW, insertsH)) model.selectedInsert = null;
         if (popupMacro >= 0) { // an open drop-down takes the click: a value chooses it, anywhere else closes it
             // (it stays open until the press is handled: Bitwig may ask again for the same press)
             int index = popupMacro;
@@ -2113,6 +2168,7 @@ final class MasterBoWidget extends dve implements drv {
             if (pressed) return;
             pressed = true;
             try {
+                model.selectedInsert = null; // a click on anything else in bo Master ends the insert's selection
                 action.run();
                 model.refresh();
                 jbi();
@@ -2154,7 +2210,10 @@ final class MasterBoWidget extends dve implements drv {
         public void cfM(dJI release) {
             try {
                 if (!dragging) {
-                    if (from < model.inserts.size()) model.selectInsert(model.inserts.get(from)); // a click: select it (Delete removes it)
+                    if (from < model.inserts.size()) { // a click: select it and take the keyboard, so Delete / Backspace removes it
+                        model.selectInsert(model.inserts.get(from));
+                        takeKeyboard();
+                    }
                 } else if (dragGap >= 0 && dragGap != from && dragGap != from + 1 && from < model.inserts.size()) {
                     model.moveInsert(model.inserts.get(from), dragGap);
                 }
