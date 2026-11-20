@@ -6,7 +6,8 @@ Mods and devices for Bitwig Studio. They run with the Patchbay mod loader (BML) 
   <tr>
     <td valign="top"><img src="mods/bo-master/media/bo-master-panel.png" alt="bo Master" height="530"></td>
     <td valign="top">
-      <img src="devices/bo-safety/media/bo-safety.png" alt="bo Safety"><br>
+      <img src="devices/bo-safety/media/bo-safety.png" alt="bo Safety" height="293">
+      <img src="mods/save-incrementally/media/file-menu.png" alt="Save Incrementally in the File menu" height="293"><br>
       <img src="devices/bo-curve/media/bo-curve.gif" alt="bo Curve" width="420">
     </td>
   </tr>
@@ -23,8 +24,6 @@ The devices has to be download and installed.
 **Download:** [bo-master.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master.zip) and [panels-framework.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/panels-framework.zip) (needed). Its meters come from the devices [bo LUFS](devices/bo-lufs), [bo Spectrum](devices/bo-spectrum) and [bo Scope](devices/bo-scope).
 
 ### [Save Incrementally](mods/save-incrementally)
-
-<img src="mods/save-incrementally/media/file-menu.png" alt="Save Incrementally in the File menu" width="260">
 
 Saves the project as its next numbered version: `Mix_009` becomes `Mix_010`, if the name doesn't end on a digit it will add one.
 
