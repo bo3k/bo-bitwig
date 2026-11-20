@@ -3,8 +3,12 @@
 Mods and devices for Bitwig Studio. They run with the Patchbay mod loader (BML) on Bitwig 6.1.4 and 6.1.7 for Windows.
 
 <p>
-  <img src="mods/bo-master/media/bo-master-panel.png" alt="bo Master" height="520">
+  <img src="mods/bo-master/media/bo-master-panel.png" alt="bo Master" height="520" align="top">
   &nbsp;
+  <img src="devices/bo-safety/media/bo-safety.png" alt="bo Safety" align="top">
+</p>
+
+<p>
   <img src="devices/bo-curve/media/bo-curve.gif" alt="bo Curve" width="420">
 </p>
 
