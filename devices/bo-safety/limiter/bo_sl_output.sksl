@@ -1,0 +1,26 @@
+// BO Safety Limiter: the output's state. Passing: green, full. Muted: red, with the 4 s hold's
+// progress as a lighter line along the bottom. Recovering: orange, filled as far as the gain.
+// audioLow: input rel dB, state (0 passing, 1 muted, 2 recovering), gain, hold progress.
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float boFrame = step(fragCoord.x, 1.) + step(boRes.x - 1., fragCoord.x) + step(fragCoord.y, 1.) + step(boRes.y - 1., fragCoord.y);
+    float boState = audioLow.y;
+    float boGain = clamp(audioLow.z, 0., 1.);
+    float boHold = clamp(audioLow.w, 0., 1.);
+    float3 boTrack = float3(.184, .184, .184);
+    float3 boGreen = float3(.298, .788, .416);
+    float3 boOrange = float3(1., .529, .075);
+    float3 boRed = float3(.86, .14, .11);
+    float boFill = step(fragCoord.x, 1. + (boRes.x - 2.) * boGain);
+    float3 boCol = boFill > .5 ? (boState > 1.5 ? boOrange : boGreen) : boTrack;
+    float boMuted = step(.5, boState) * (1. - step(1.5, boState));
+    float boHoldLine = step(boRes.y - 4., fragCoord.y) * step(fragCoord.x, 1. + (boRes.x - 2.) * boHold);
+    float3 boMutedCol = boHoldLine > .5 ? float3(1., .55, .5) : boRed;
+    boCol = boMuted > .5 ? boMutedCol : boCol;
+    boCol = boFrame > .5 ? float3(.102, .102, .102) : boCol;
+    return half4(half3(boCol), 1.);
+}

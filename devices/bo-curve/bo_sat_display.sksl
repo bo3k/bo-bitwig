@@ -1,0 +1,104 @@
+// BO Sat Test: transfer-curve display (conservative style).
+// audioLow:    drive (linear gain), knee exponent k, mix (0..1), output (linear gain)
+// audioMedium: input peak, output peak, tone (dB), link compensation (wet gain)
+// audioHigh:   asymmetry a (-1..1): ceilings upper 2^-a, lower 2^+a; headroom (1 = clipper, 3.98 = saturator);
+//              mode (0 Sigmoid, 1 Triode, 2 Crush); Curve 0..1
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+// same curve as the DSP: y = x / (1 + |x|^k)^(1/k), in the form that cannot overflow
+float boShape(float x, float k) {
+    float a = abs(x);
+    float yHigh = 1. / pow(pow(max(a, 1.), -k) + 1., 1. / k);
+    float yLow = a / pow(1. + pow(min(a, 1.), k), 1. / k);
+    float y = a > 1. ? yHigh : yLow;
+    return x < 0. ? -y : y;
+}
+
+float boShapeA(float x, float k, float a) {
+    float c = x < 0. ? exp2(a) : exp2(-a);
+    return c * boShape(x / c, k);
+}
+
+// Triode and Crush, as in the DSP (audioHigh.z = mode, audioHigh.w = Curve 0..1)
+float boTriode(float x, float k, float a) {
+    if (x >= 0.) {
+        float up = .7 * exp2(-a);
+        return up * (1. - exp(-x / up));
+    }
+    float dn = 1.5 * exp2(a);
+    return dn * boShape(x / dn, k);
+}
+
+float boCrush(float y, float c01, float a) {
+    float lv = exp2(15. - 14. * c01);
+    return floor(y * lv + .5 + .45 * a) / lv;
+}
+
+// the curve's ceiling sits 12 dB above full scale (H = 3.981), as in the DSP
+float boTransfer(float x, float4 st, float comp) {
+    float hr = audioHigh.y > 0.5 ? audioHigh.y : 3.9810717055349722;
+    float u = x * st.x / hr;
+    float sh = audioHigh.z > .5 && audioHigh.z < 1.5 ? boTriode(u, st.y, audioHigh.x) : boShapeA(u, st.y, audioHigh.x);
+    if (audioHigh.z > 1.5)
+        sh = boCrush(sh, audioHigh.w, audioHigh.x);
+    float wet = hr * sh;
+    return ((1. - st.z) * x + st.z * wet * comp) * st.w;
+}
+
+float boLine(float distancePx, float widthPx) {
+    return 1. - smoothstep(widthPx - .75, widthPx + .75, distancePx);
+}
+
+half4 main(float2 fragCoord) {
+    // plot area: 6 px margin; plotted range -1.25..1.25 on both axes, y down
+    float2 boArea = iResolution.xy - float2(12., 12.);
+    float2 boUv = (fragCoord - float2(6., 6.)) / boArea;
+    float boX = -1.25 + 2.5 * boUv.x;
+    float boYPix = 1.25 - 2.5 * boUv.y;
+    float boSx = boArea.x / 2.5;
+    float boSy = boArea.y / 2.5;
+
+    float4 st = audioLow;
+    float comp = audioMedium.w > 0. ? audioMedium.w : 1.;
+    if (st.x < 0.5) {
+        st = float4(1., 4.23, 1., 1.);  // nothing received yet: defaults (Curve 25 %)
+    }
+
+    float3 col = float3(.133);                       // the grey of Tool's meter background
+    float boIn = step(0., boUv.x) * step(boUv.x, 1.) * step(0., boUv.y) * step(boUv.y, 1.);
+
+    // grid: axes and the +-1 (0 dBFS) lines
+    float gx = min(abs(boX), min(abs(boX - 1.), abs(boX + 1.))) * boSx;
+    float gy = min(abs(boYPix), min(abs(boYPix - 1.), abs(boYPix + 1.))) * boSy;
+    col = mix(col, float3(.20, .21, .23), boIn * boLine(min(gx, gy), .5));
+
+    // unity line y = x
+    float dUnity = abs(boYPix - boX) * boSy / length(float2(1., boSy / boSx));
+    col = mix(col, float3(.30, .32, .35), boIn * .8 * boLine(dUnity, .6));
+
+    // transfer curve, fill to zero
+    float boY = boTransfer(boX, st, comp);
+    float boH = 1. / boSx;
+    float slope = (boTransfer(boX + boH, st, comp) - boTransfer(boX - boH, st, comp)) / (2. * boH) * boSy / boSx;
+    float fillMask = step(min(0., boY), boYPix) * step(boYPix, max(0., boY));
+    col = mix(col, float3(.93, .55, .24), boIn * .10 * fillMask);
+
+    // input level guides at +-peak
+    float pk = clamp(audioMedium.x, 0., 1.25);
+    float hasPk = step(.001, pk);
+    float dGuide = min(abs(boX - pk), abs(boX + pk)) * boSx;
+    col = mix(col, float3(.62, .82, .76), boIn * hasPk * .35 * boLine(dGuide, .5));
+
+    // the curve
+    float dCurve = abs(boYPix - boY) * boSy / length(float2(1., slope));
+    col = mix(col, float3(.93, .55, .24), boIn * boLine(dCurve, 1.2));
+
+    // dot on the curve at the input peak
+    float2 dotPx = float2(pk * boSx, -boTransfer(pk, st, comp) * boSy);
+    float2 herePx = float2(boX * boSx, -boYPix * boSy);
+    col = mix(col, float3(.62, .82, .76), boIn * hasPk * boLine(length(herePx - dotPx), 3.));
+
+    return half4(col, 1.);
+}

@@ -1,0 +1,143 @@
+// BO Safety: protects speakers, headphones and ears. Zero latency, no processing of the
+// sound itself: the signal passes unchanged (gain 1) or the output is muted.
+//   limit      Limit dB, -18 .. +10 dBFS (default 0). Not a number or below the range -> -18 (safest).
+//   tp_margin  TP Safety Margin: on = trips 1 dB lower, for peaks between samples (inter-sample peaks).
+// Every input sample on both channels is checked before any gain is applied. One sample over the
+// trip level T (or a NaN / Inf sample) mutes the output on that very sample: the sample that went
+// over is never output. After 4 s of clean input (every sample of both channels at or below T)
+// the volume comes back over 2 s on a half-cosine curve. Any over during the hold or the ramp mutes
+// again and restarts the 4 s. The output is always 0 or g * x with 0 <= g <= 1 and |x| <= T, and a
+// final clamp to +-T stays in as a second guarantee.
+// The NaN test is written as !(|x| <= T), which is true for NaN as well as for overs.
+// ui_a: input peak relative to T (dB, 300 ms release), state (0 passing, 1 muted, 2 recovering),
+//       gain, hold progress (0 .. 1).
+struct bo_safety_limiter
+{
+    audio_inport<f32<2>> in;
+    audio_inport<f32> limit;
+    value_inport<bool> tp_margin;
+    audio_outport<f32<2>> out;
+    audio_outport<f32<4>> ui_a;
+    audio_outport<f32<4>> ui_b;   // meter: output peak L, R (dB, 300 ms release), peak hold L, R (dB, 1.5 s)
+
+    bool tripped = false;   // muted or recovering
+    f32 gain = 1.0;
+    i32 clean = 0;          // clean samples since the last over
+    i32 ramp = 0;           // position on the recovery ramp
+    f32 peak = 0.0;
+    f32 pk_l = 0.0;
+    f32 pk_r = 0.0;
+    f32 hold_l = 0.0;
+    f32 hold_r = 0.0;
+    i32 hold_t_l = 0;
+    i32 hold_t_r = 0;
+
+    // a reset (sample rate change, engine restart) never brings the sound back early:
+    // muted or recovering stays muted and the 4 s start again
+    reset
+    {
+        if (tripped)
+        {
+            gain = 0.0;
+            clean = 0;
+            ramp = 0;
+        }
+        peak = 0.0;
+    }
+
+    process
+    {
+        f32 rate = cast(EC.samplerate, f32);
+        if (!(rate >= 8000.0))
+            rate = 48000.0;
+        i32 hold_n = cast(rate * 4.0, i32);
+        i32 ramp_n = cast(rate * 2.0, i32);
+
+        f32 lim = limit;
+        if (!(lim >= -18.0))
+            lim = -18.0;
+        if (lim > 10.0)
+            lim = 10.0;
+        if (tp_margin)
+            lim = lim - 1.0;
+        f32 t = exp(lim * 0.11512925464970229);
+
+        f32<2> x = in;
+        f32 l = x[0];
+        f32 r = x[1];
+        bool over = !(fabs(l) <= t) || !(fabs(r) <= t);
+
+        if (over)
+        {
+            tripped = true;
+            gain = 0.0;
+            clean = 0;
+            ramp = 0;
+        }
+        else
+        {
+            if (tripped)
+            {
+                if (clean < hold_n)
+                {
+                    clean = clean + 1;
+                }
+                else
+                {
+                    ramp = ramp + 1;
+                    if (ramp >= ramp_n)
+                    {
+                        tripped = false;
+                        gain = 1.0;
+                    }
+                    else
+                    {
+                        gain = 0.5 - 0.5 * cos(3.141592653589793 * cast(ramp, f32) / cast(ramp_n, f32));
+                    }
+                }
+            }
+        }
+
+        f32 yl = 0.0;
+        f32 yr = 0.0;
+        if (!over)
+        {
+            yl = l * gain;
+            yr = r * gain;
+        }
+        yl = fmax(-t, fmin(t, yl));
+        yr = fmax(-t, fmin(t, yr));
+        out[0] = yl;
+        out[1] = yr;
+
+        // display: input peak relative to T, the state, the gain, the hold's progress
+        f32 a = fmax(fabs(l), fabs(r));
+        if (!(a <= 1000000.0))
+            a = 1000000.0;
+        peak = fmax(a, peak * exp(-1.0 / (0.3 * rate)));
+        f32 rel = -200.0;
+        if (peak > 0.000001)
+            rel = 20.0 * log10(peak / t);
+        f32 state = 0.0;
+        if (tripped)
+            state = 1.0;
+        if (tripped && clean >= hold_n)
+            state = 2.0;
+        ui_a[0] = rel;
+        ui_a[1] = state;
+        ui_a[2] = gain;
+        ui_a[3] = cast(clean, f32) / cast(hold_n, f32);
+
+        // the meter: output peaks per channel, and peak holds (1.5 s, then they fall with the peak)
+        f32 rel_k = exp(-1.0 / (0.3 * rate));
+        pk_l = fmax(fabs(yl), pk_l * rel_k);
+        pk_r = fmax(fabs(yr), pk_r * rel_k);
+        i32 hold_len = cast(rate * 1.5, i32);
+        if (pk_l >= hold_l) { hold_l = pk_l; hold_t_l = 0; } else { hold_t_l = hold_t_l + 1; if (hold_t_l > hold_len) hold_l = pk_l; }
+        if (pk_r >= hold_r) { hold_r = pk_r; hold_t_r = 0; } else { hold_t_r = hold_t_r + 1; if (hold_t_r > hold_len) hold_r = pk_r; }
+        ui_b[0] = 20.0 * log10(fmax(pk_l, 0.0000001));
+        ui_b[1] = 20.0 * log10(fmax(pk_r, 0.0000001));
+        ui_b[2] = 20.0 * log10(fmax(hold_l, 0.0000001));
+        ui_b[3] = 20.0 * log10(fmax(hold_r, 0.0000001));
+    }
+}

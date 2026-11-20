@@ -1,0 +1,22 @@
+// BO Safety Limiter: input peak relative to the trip level, horizontal, -30 .. +6 dB.
+// Bitwig-meter look (dark frame, dark grey track); green fill, red above the trip level;
+// the trip level itself is a red line. audioLow: rel dB, state, gain, hold progress.
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float boFrame = step(fragCoord.x, 1.) + step(boRes.x - 1., fragCoord.x) + step(fragCoord.y, 1.) + step(boRes.y - 1., fragCoord.y);
+    float boV = audioLow.x;
+    float boPos = clamp((boV + 30.) / 36., 0., 1.);
+    float boFill = step(fragCoord.x, 1. + (boRes.x - 2.) * boPos) * step(-199., boV);
+    float3 boCol = float3(.184, .184, .184);
+    float3 boFillCol = boV > 0. ? float3(1., .15, .12) : float3(.298, .788, .416);
+    boCol = boFill > .5 ? boFillCol : boCol;
+    float boTx = 1. + (boRes.x - 2.) * (30. / 36.);
+    float boOnT = 1. - smoothstep(.5, 1.5, abs(fragCoord.x - boTx));
+    boCol = mix(boCol, float3(1., .15, .12), boOnT);
+    boCol = boFrame > .5 ? float3(.102, .102, .102) : boCol;
+    return half4(half3(boCol), 1.);
+}

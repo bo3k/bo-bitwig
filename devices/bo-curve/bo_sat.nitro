@@ -1,0 +1,259 @@
+// BO Sat Test: stereo saturator.
+//   drive  : dB, 0..48 (cube-root knob response). The curve's ceiling sits 12 dB above full
+//            scale, so Drive 0 is clean and Drive pushes the signal up into the curve.
+//   output : dB, -24..12
+//   curve  : %, 0 = soft (k = 2), 100 = (almost) hard clip (k = 40)
+//   mix    : %, dry/wet
+//   tone   : dB, -12..12 total tilt, pivot 180 Hz. Applied before the saturator and exactly
+//            inverted after it (pre/de-emphasis): positive = highs hit the curve harder.
+//   asym   : %, -100..100. Ceilings of the two halves: upper 2^-a, lower 2^+a (a = asym/100).
+//            Unity slope at zero on both sides, so the curve stays smooth through the centre.
+//   mode   : curve type: 0 Smooth (the sigmoid below), 1 Triode (asymmetric: early exponential top,
+//            late Curve-shaped bottom), 2 Bit (Smooth, then the amplitude rounded to 2^bits steps,
+//            15 bits at Curve 0 .. 1 bit at Curve 100; Asym offsets the rounding)
+//   link   : on = saturator mode: curve ceiling +12 dBFS, Drive 0 clean, wet compensated by -drive dB
+//            off (default) = clipper mode: curve ceiling 0 dBFS, Drive is plain gain into it, peaks held at 0 dBFS
+//            (the headroom morphs smoothly between the two when toggled)
+//
+// Wet path:  tone(+T) -> x drive -> asymmetric curve (ceiling +12 dBFS) -> x 1/drive (link)
+//            -> tone(-T) -> DC block (5 Hz)
+// Curve family: y = H * s(x / H), s(u) = u / (1 + |u|^k)^(1/k), H = +12 dB, k = 2 .. 40.
+// Tilt: H(s) = A (s + w0/A) / (s + w0 A), A = 10^(T/40): unity at w0, lows 1/A, highs A.
+// Bilinear transform prewarped at w0; the post filter is H with A -> 1/A, i.e. exactly 1/H.
+struct bo_sat
+{
+    audio_inport<f32<2>> in;
+    audio_inport<f32> drive;
+    audio_inport<f32> output;
+    audio_inport<f32> curve;
+    audio_inport<f32> mix;
+    audio_inport<f32> tone;
+    audio_inport<f32> asym;
+    value_inport<bool> link;
+    value_inport<i32> mode;
+    audio_outport<f32<2>> out;
+    audio_outport<f32<4>> ui_a;   // display: drive gain, knee k, mix, output gain
+    audio_outport<f32<4>> ui_b;   // display: input peak, output peak, tone dB, link compensation
+    audio_outport<f32<4>> ui_c;   // display: asymmetry (-1..1)
+
+    f32 s_drive = 1.0;
+    f32 s_out = 1.0;
+    f32 s_mix = 1.0;
+    f32 s_curve = 0.25;
+    f32 s_tilt = 0.0;
+    f32 s_link = 0.0;
+    f32 s_asym = 0.0;
+    i32 m_mode = 0;
+    f32 m_c01 = 0.25;
+    f32 m_as = 0.0;
+    f32 dcx_l = 0.0;
+    f32 dcx_r = 0.0;
+    f32 dcy_l = 0.0;
+    f32 dcy_r = 0.0;
+    f32 pre_l = 0.0;
+    f32 pre_r = 0.0;
+    f32 post_l = 0.0;
+    f32 post_r = 0.0;
+    f32 peak_in = 0.0;
+    f32 peak_out = 0.0;
+
+    f32 clampf(f32 x, f32 lo, f32 hi)
+    {
+        return fmax(lo, fmin(hi, x));
+    }
+
+    f32 dbgain(f32 db)
+    {
+        return exp(db * 0.11512925464970229);
+    }
+
+    // knee exponent: 2 * (40 / 2)^c
+    f32 knee(f32 c)
+    {
+        return 2.0 * exp(c * 2.995732273553991);
+    }
+
+    // two algebraically equal forms, chosen so pow() never overflows
+    f32 shape(f32 x, f32 k)
+    {
+        f32 a = fabs(x);
+        f32 y = 0.0;
+        if (a > 1.0)
+            y = 1.0 / pow(pow(a, -k) + 1.0, 1.0 / k);
+        else
+            y = a / pow(1.0 + pow(a, k), 1.0 / k);
+        if (x < 0.0)
+            y = -y;
+        return y;
+    }
+
+    // asymmetric version: each half has its own ceiling (c_up for x >= 0, c_dn for x < 0)
+    f32 shape2(f32 x, f32 k, f32 c_up, f32 c_dn)
+    {
+        f32 c = c_up;
+        if (x < 0.0)
+            c = c_dn;
+        return c * shape(x / c, k);
+    }
+
+    // Triode: the positive half compresses early and saturates exponentially (grid current), the
+    // negative half bends late with the Curve knee (cutoff side); slope 1 at zero on both sides
+    f32 triode(f32 x, f32 k, f32 c_up, f32 c_dn)
+    {
+        f32 y = 0.0;
+        if (x >= 0.0)
+        {
+            f32 up = 0.7 * c_up;
+            y = up * (1.0 - exp(-x / up));
+        }
+        else
+        {
+            f32 dn = 1.5 * c_dn;
+            y = dn * shape(x / dn, k);
+        }
+        return y;
+    }
+
+    // Crush: amplitude rounded to 2^bits steps of the ceiling, bits from Curve (15 .. 1), linear: 4 steps at Curve 100 %
+    f32 crush(f32 y, f32 c01, f32 a)
+    {
+        f32 lv = exp((15.0 - 14.0 * c01) * 0.6931471805599453);
+        return floor(y * lv + 0.5 + 0.45 * a) / lv;
+    }
+
+    // the curve of the chosen mode (ceiling 1, before the headroom and link gains)
+    f32 shape_mode(f32 x, i32 md, f32 k, f32 c_up, f32 c_dn, f32 c01, f32 a)
+    {
+        f32 y = 0.0;
+        if (md == 1)
+            y = triode(x, k, c_up, c_dn);
+        else
+            y = shape2(x, k, c_up, c_dn);
+        if (md == 2)
+            y = crush(y, c01, a);
+        return y;
+    }
+
+    reset
+    {
+        s_drive = 1.0;
+        s_out = 1.0;
+        s_mix = 1.0;
+        s_curve = 0.25;
+        s_tilt = 0.0;
+        s_link = 0.0;
+        s_asym = 0.0;
+        dcx_l = 0.0;
+        dcx_r = 0.0;
+        dcy_l = 0.0;
+        dcy_r = 0.0;
+        pre_l = 0.0;
+        pre_r = 0.0;
+        post_l = 0.0;
+        post_r = 0.0;
+        peak_in = 0.0;
+        peak_out = 0.0;
+    }
+
+    process
+    {
+        f32 rate = cast(EC.samplerate, f32);
+        f32 kc = fmin(1.0, 1.0 / (0.005 * rate));
+        f32 t_drive = dbgain(clampf(drive, 0.0, 48.0));
+        f32 t_out = dbgain(clampf(output, -24.0, 12.0));
+        f32 t_mix = 0.01 * clampf(mix, 0.0, 100.0);
+        f32 t_curve = 0.01 * clampf(curve, 0.0, 100.0);
+        f32 t_tilt = clampf(tone, -12.0, 12.0);
+        f32 t_asym = 0.01 * clampf(asym, -100.0, 100.0);
+        f32 t_link = 0.0;
+        if (link)
+            t_link = 1.0;
+
+        s_drive = s_drive + kc * (t_drive - s_drive);
+        s_out = s_out + kc * (t_out - s_out);
+        s_mix = s_mix + kc * (t_mix - s_mix);
+        s_curve = s_curve + kc * (t_curve - s_curve);
+        s_tilt = s_tilt + kc * (t_tilt - s_tilt);
+        s_link = s_link + kc * (t_link - s_link);
+        s_asym = s_asym + kc * (t_asym - s_asym);
+        f32 c_up = exp(-s_asym * 0.6931471805599453);
+        f32 c_dn = exp(s_asym * 0.6931471805599453);
+        f32 k = knee(s_curve);
+        f32 comp = 1.0 + s_link * (1.0 / s_drive - 1.0);
+
+        // tilt coefficients (first order, pivot 180 Hz)
+        f32 w = 3.141592653589793 * 180.0 / rate;
+        f32 t = sin(w) / cos(w);
+        f32 ga = exp(s_tilt * 0.057564627324851145);
+        f32 gi = 1.0 / ga;
+        f32 dp = 1.0 + ga * t;
+        f32 b0 = (ga + t) / dp;
+        f32 b1 = (t - ga) / dp;
+        f32 a1 = (ga * t - 1.0) / dp;
+        f32 dq = 1.0 + gi * t;
+        f32 c0 = (gi + t) / dq;
+        f32 c1 = (t - gi) / dq;
+        f32 e1 = (gi * t - 1.0) / dq;
+
+        f32<2> x = in;
+        f32 dry_l = x[0];
+        f32 dry_r = x[1];
+
+        // pre-emphasis (transposed direct form II)
+        f32 em_l = b0 * dry_l + pre_l;
+        pre_l = b1 * dry_l - a1 * em_l;
+        f32 em_r = b0 * dry_r + pre_r;
+        pre_r = b1 * dry_r - a1 * em_r;
+
+        // curve ceiling 12 dB above full scale: H * s(x / H)
+        // headroom: 0 dB (clipper, link off) .. +12 dB (saturator, link on), morphed by s_link
+        f32 hr = exp(s_link * 1.3815510557964273);
+        i32 md = mode;
+        if (md < 0)
+            md = 0;
+        if (md > 2)
+            md = 2;
+        m_mode = md;
+        m_c01 = s_curve;
+        m_as = s_asym;
+        f32 sat_l = hr * shape2(em_l * s_drive / hr, k, c_up, c_dn) * comp;
+        f32 sat_r = hr * shape2(em_r * s_drive / hr, k, c_up, c_dn) * comp;
+
+        // de-emphasis: exact inverse of the pre filter
+        f32 de_l = c0 * sat_l + post_l;
+        post_l = c1 * sat_l - e1 * de_l;
+        f32 de_r = c0 * sat_r + post_r;
+        post_r = c1 * sat_r - e1 * de_r;
+
+        // DC blocker (one-pole high-pass at 5 Hz): asymmetry creates a DC offset
+        f32 rdc = exp(-31.41592653589793 / rate);
+        f32 wet_l = de_l - dcx_l + rdc * dcy_l;
+        dcx_l = de_l;
+        dcy_l = wet_l;
+        f32 wet_r = de_r - dcx_r + rdc * dcy_r;
+        dcx_r = de_r;
+        dcy_r = wet_r;
+
+        f32 out_l = ((1.0 - s_mix) * dry_l + s_mix * wet_l) * s_out;
+        f32 out_r = ((1.0 - s_mix) * dry_r + s_mix * wet_r) * s_out;
+        out[0] = out_l;
+        out[1] = out_r;
+
+        // display data: peak hold with ~300 ms release
+        f32 rel = exp(-1.0 / (0.3 * rate));
+        peak_in = fmax(fmax(fabs(dry_l), fabs(dry_r)), peak_in * rel);
+        peak_out = fmax(fmax(fabs(out_l), fabs(out_r)), peak_out * rel);
+        ui_a[0] = s_drive;
+        ui_a[1] = k;
+        ui_a[2] = s_mix;
+        ui_a[3] = s_out;
+        ui_b[0] = peak_in;
+        ui_b[1] = peak_out;
+        ui_b[2] = s_tilt;
+        ui_b[3] = comp;
+        ui_c[0] = s_asym;
+        ui_c[1] = hr;
+        ui_c[2] = cast(m_mode, f32);
+        ui_c[3] = s_curve;
+    }
+}

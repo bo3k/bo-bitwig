@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parents[1] / "tools" / "device-gen"))  # bwgen, the device generator
 
 from bwgen import Device, Trigger  # noqa: E402
 

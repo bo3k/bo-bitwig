@@ -1,0 +1,74 @@
+// BO Safety: the output meter in the look of Bitwig's Tool device meter: a dark strip, the scale's
+// marks right of its numbers (the numbers are Bitwig labels on top), two narrow bars (L, R) at the
+// right, from -80 dB at the bottom to +10 dB at the top, linear in dB. The fill is a gradient by
+// height, as the Tool meter's (green, yellow, orange, red above 0 dB); the peak hold as a line. Above the bars, as wide as both: the state (green
+// passing, red muted with the 4 s hold's progress along its bottom, orange recovering as far as the gain).
+// audioLow: input rel dB, state, gain, hold progress   audioMedium: peak L, peak R, hold L, hold R (dB)
+uniform float4 audioLow;
+uniform float4 audioMedium;
+uniform float4 audioHigh;
+
+float boPos(float boDb) {
+    return clamp((boDb + 80.) / 90., 0., 1.);
+}
+
+// the bars' colour by height, a gradient as the Tool meter's: green low, through yellow to orange
+// from about -32 dB up to 0 dB, red above 0 dB
+float3 boLevelCol(float boDb) {
+    float3 boGreen = float3(.42, .72, .18);
+    float3 boYellow = float3(.93, .84, .2);
+    float3 boOrange = float3(.98, .53, .06);
+    float3 boRed = float3(.92, .22, .16);
+    float3 boC = mix(boGreen, boYellow, smoothstep(-58., -46., boDb));
+    boC = mix(boC, boOrange, smoothstep(-44., -32., boDb));
+    boC = mix(boC, boRed, smoothstep(0., 1., boDb));
+    return boC;
+}
+
+float boNear(float boY, float boAt, float boHalf) {
+    return 1. - step(boHalf, abs(boY - boAt));
+}
+
+half4 main(float2 fragCoord) {
+    float2 boRes = iResolution.xy;
+    float boU = boRes.x / 64.;                 // the strip is 64 px wide at 100 %
+    float boX = fragCoord.x / boU;             // in 100 % pixels
+    float boY = fragCoord.y / boU;
+    float boTop = 25.;
+    float boBottom = boRes.y / boU - 6.;
+    float boH = boBottom - boTop;
+    float3 boCol = float3(.106, .106, .106);   // the strip
+    // the scale's marks, right of the numbers
+    float boMark = 0.;
+    boMark = max(boMark, boNear(boY, boTop + boH * (1. - boPos(10.)), 1.));
+    boMark = max(boMark, boNear(boY, boTop + boH * (1. - boPos(0.)), 1.));
+    boMark = max(boMark, boNear(boY, boTop + boH * (1. - boPos(-20.)), 1.));
+    boMark = max(boMark, boNear(boY, boTop + boH * (1. - boPos(-40.)), 1.));
+    boMark = max(boMark, boNear(boY, boTop + boH * (1. - boPos(-60.)), 1.));
+    boMark = max(boMark, boNear(boY, boTop + boH * (1. - boPos(-80.)), 1.));
+    float boInMark = step(25., boX) * step(boX, 29.);
+    boCol = boMark * boInMark > .5 ? float3(.62, .62, .62) : boCol;
+    // the bars: L 35..45, R 47..57
+    float boInL = step(35., boX) * step(boX, 45.);
+    float boInR = step(47., boX) * step(boX, 57.);
+    float boInY = step(boTop, boY) * step(boY, boBottom);
+    float boPk = boInL > .5 ? audioMedium.x : audioMedium.y;
+    float boHd = boInL > .5 ? audioMedium.z : audioMedium.w;
+    float boLevelY = boTop + boH * (1. - boPos(boPk));
+    float boHoldY = boTop + boH * (1. - boPos(boHd));
+    float boDbHere = 10. - 90. * (boY - boTop) / boH;
+    float3 boBar = float3(.176, .176, .176);
+    boBar = (boY >= boLevelY && boPk > -80.) ? boLevelCol(boDbHere) : boBar;
+    boBar = (abs(boY - boHoldY) < 1. && boHd > -80.) ? boLevelCol(boHd) : boBar;
+    boCol = (boInL + boInR) * boInY > .5 ? boBar : boCol;
+    // the state, above the bars and as wide as both (35 .. 57), 6 .. 20
+    float boInS = step(35., boX) * step(boX, 57.) * step(6., boY) * step(boY, 20.);
+    float boState = audioLow.y;
+    float boFill = step(boX, 35. + 22. * clamp(audioLow.z, 0., 1.));
+    float3 boS = boFill > .5 ? (boState > 1.5 ? float3(1., .529, .075) : float3(.298, .788, .416)) : float3(.176, .176, .176);
+    float boMuted = step(.5, boState) * (1. - step(1.5, boState));
+    float boHoldLine = step(17., boY) * step(boX, 35. + 22. * clamp(audioLow.w, 0., 1.));
+    boS = boMuted > .5 ? (boHoldLine > .5 ? float3(1., .55, .5) : float3(.86, .14, .11)) : boS;
+    boCol = boInS > .5 ? boS : boCol;
+    return half4(half3(boCol), 1.);
+}
