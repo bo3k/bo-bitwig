@@ -61,9 +61,9 @@ final class MasterBoWidget extends dve implements drv {
     // Sizes in Bitwig's layout units (scaled with the UI, eLY).
     private static final long PAD = 10;          // gaps between the columns (the wide layout)
     private static final int EDGE = 1;           // the outline around the panel, in pixels
-    private static final long COLOUR_BAR = 4;    // the master's colour bar at the bottom, as Bitwig's mixer
+    private static final long COLOUR_BAR = 56;   // the master's colour bar at the bottom, in tenths: 5.6, as Bitwig's mixer (7 px at 125 %)
     private static final long BOTTOM_GAP = 4;    // between the content and the colour bar
-    private static final long HEADER = 46; // as tall as Bitwig's own master header in the mixer
+    private static final long HEADER = 51; // as tall as Bitwig's own master header in the mixer (64 px at 125 %)
     private static final long ROW = 20;
     private static final long PAN_HEIGHT = 18;
     private static final long READOUT = 18;
@@ -1765,7 +1765,7 @@ final class MasterBoWidget extends dve implements drv {
      * Under the big meters (or the header, without them) to the bottom: (35, 35, 35); behind the pan,
      * the scale, the meters and the fader: (26, 26, 26), from the PAN label down.
      */
-    private double colourBarH() { return Math.round(eLY(COLOUR_BAR)); }
+    private double colourBarH() { return Math.round(eLY(COLOUR_BAR) / 10.0); }
 
     /** The master's colour bar at the bottom and the near-black 1 px outline around the whole panel, as a mixer strip. */
     private void paintFrame(SYo g) {
