@@ -1,5 +1,7 @@
 # Panel: bo Master
 
+https://github.com/user-attachments/assets/1be3e125-fb3e-419e-9922-86086e3542f7
+
 For Bitwig 6.1.4 (Windows x64). Needs **Framework: Panels** 0.2.0-dev.2.bo.2 or later, Bo's build with views on the browser side (and the framework's own prerequisites, Framework: Settings and Framework: Actions and Menus).
 
 A panel with the master track's strip: a VU meter, fader, pan, peak and RMS meters with peak hold, and the master's inserts with their windows.
