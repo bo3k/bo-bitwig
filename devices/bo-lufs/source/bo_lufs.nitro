@@ -26,7 +26,7 @@
 // which bo Master reads: bm_a momentary and bm_b short-term (the first), bm_c integrated and bm_d
 // true peak max + 1000 (the second; the offset tells the two apart). Signals, not parameter values:
 // a value the DSP sends to a parameter is an undoable change in Bitwig, ten a second.
-// (m_val .. tp_val are no longer sent; they stay declared so the old readout atoms keep their ports.)
+// (m_val .. tp_val are no longer sent. Audio outputs come first: an oscilloscope only connects to those.)
 struct bo_lufs
 {
     audio_inport<f32<2>> in;
@@ -38,14 +38,14 @@ struct bo_lufs
     audio_outport<f32<2>> out;
     audio_outport<f32<4>> ui_a;
     audio_outport<f32<4>> ui_b;
-    value_outport<f32> m_val;
-    value_outport<f32> s_val;
-    value_outport<f32> i_val;
-    value_outport<f32> tp_val;
     audio_outport<f32> bm_a;
     audio_outport<f32> bm_b;
     audio_outport<f32> bm_c;
     audio_outport<f32> bm_d;
+    value_outport<f32> m_val;
+    value_outport<f32> s_val;
+    value_outport<f32> i_val;
+    value_outport<f32> tp_val;
 
     // K-weighting (transposed direct form II, f64)
     f64 ab0 = 1.0;

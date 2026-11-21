@@ -2,7 +2,7 @@
 instead of four hidden readout parameters the DSP wrote every 100 ms (each write was an undoable
 "change made by controller").
 
-  - the Nitro code (stored as source) gets four audio outputs bm_a .. bm_d (ports 7 .. 10) carrying
+  - the Nitro code (stored as source) gets four audio outputs bm_a .. bm_d (ports 3 .. 6) carrying
     M, S, I and TP max + 1000 as steady signals, and no longer sends m_val .. tp_val;
   - two oscilloscope atoms (cloned from bo Scope's) take bm_a / bm_b and bm_c / bm_d as inputs A / B.
 
@@ -16,7 +16,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bwdevice import BwDevice  # noqa: E402
 from bwobj import Ref, parse_body, write_body, walk, clone  # noqa: E402
 
-PORTS = [(7, 8), (9, 10)]          # bm_a, bm_b -> first oscilloscope; bm_c, bm_d -> second
+PORTS = [(3, 4), (5, 6)]           # bm_a, bm_b -> first oscilloscope; bm_c, bm_d -> second
+# Bitwig numbers a Nitro atom's audio outputs first (out 0, ui_a 1, ui_b 2, bm_a .. bm_d 3 .. 6), then its
+# value outputs (m_val .. tp_val 7 .. 10); an oscilloscope only connects to audio outputs.
+READOUT_SHIFT = 4                    # the old readout atoms: m_val .. tp_val moved from 3 .. 6 to 7 .. 10
 
 
 def main(lufs_path, scope_path, nitro_path, out_path):
@@ -39,6 +42,12 @@ def main(lufs_path, scope_path, nitro_path, out_path):
         pos = osc.get(0x1832).get(0x264)                      # where it sits in the device's editor
         pos.field(0x11).value = (1000 + 200 * n).to_bytes(len(pos.field(0x11).value), "big")
         atoms.append(osc)
+    for o in walk(root):
+        if o.cls == 0x7F5:                                   # settable_decimal_value_atom: the old readouts
+            for conn in o.get(0x1832).get(0x266):
+                if conn.get(0xF8) is not None:
+                    f = conn.field(0xF9)
+                    f.value = (int.from_bytes(f.value, "big") + READOUT_SHIFT).to_bytes(len(f.value), "big")
     dev.body = bytearray(write_body(root))
     dev.set_meta("revision_id", hashlib.sha1(bytes(dev.body)).hexdigest())
     Path(out_path).write_bytes(dev.to_bytes())
