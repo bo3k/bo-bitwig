@@ -22,11 +22,13 @@
 //   ui_a: momentary, short-term, integrated (LUFS), Reference (LUFS, plus a tiny heartbeat so the
 //         drawings refresh when only the knob moves)
 //   ui_b: true peak max since Reset (dBTP), heartbeat, 0, true peak of the last 100 ms (dBTP)
-// Values for bo Master (no value yet = -100), as steady signals into two of Bitwig's oscilloscopes,
-// which bo Master reads: bm_a momentary and bm_b short-term (the first), bm_c integrated and bm_d
-// true peak max + 1000 (the second; the offset tells the two apart). Signals, not parameter values:
-// a value the DSP sends to a parameter is an undoable change in Bitwig, ten a second.
-// (m_val .. tp_val are no longer sent. Audio outputs come first: an oscilloscope only connects to those.)
+// Values for bo Master (no value yet = -100), into two of Bitwig's oscilloscopes, which bo Master
+// reads: bm_a momentary and bm_b short-term (the first), bm_c integrated and bm_d true peak max (the
+// second). Each is sent as +-(value + 200), its sign flipping every sample, because an oscilloscope
+// only records a signal that crosses zero; true peak as +-(value + 1200), which tells the two apart.
+// Signals, not parameter values: a value the DSP sends to a parameter is an undoable change in
+// Bitwig, ten a second. (m_val .. tp_val are no longer sent. Audio outputs come first: an
+// oscilloscope only connects to those.)
 struct bo_lufs
 {
     audio_inport<f32<2>> in;
@@ -100,6 +102,7 @@ struct bo_lufs
     f32 tp_last = 0.0;
 
     f32 beat = 0.0;
+    f32 bm_sign = 1.0;   // flips every sample: the oscilloscopes only record a signal that crosses zero
     bool inited = false;
     bool dirty = true;
 
@@ -394,9 +397,10 @@ TP_FILL
         ui_b[1] = beat;
         ui_b[2] = 0.0;
         ui_b[3] = todb(fmax(tp_last, tp_blk));
-        bm_a = fmax(v_m, -100.0);
-        bm_b = fmax(v_s, -100.0);
-        bm_c = fmax(v_i, -100.0);
-        bm_d = fmax(todb(tp_max), -100.0) + 1000.0;
+        bm_sign = 0.0 - bm_sign;
+        bm_a = bm_sign * (fmax(v_m, -100.0) + 200.0);
+        bm_b = bm_sign * (fmax(v_s, -100.0) + 200.0);
+        bm_c = bm_sign * (fmax(v_i, -100.0) + 200.0);
+        bm_d = bm_sign * (fmax(todb(tp_max), -100.0) + 1200.0);
     }
 }

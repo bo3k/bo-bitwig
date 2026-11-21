@@ -20,7 +20,7 @@ half4 main(float2 boFragIn) {
     float kind = BO_KIND;
     float h = floor(boRes.y * .5 + .5);
     float y0 = floor((boRes.y - h) * .5);
-    float cov = boValue(fragCoord, v, boRes.x * BO_RIGHT, y0, h, kind > 1.5 ? 1. : 0.);
+    float cov = boValue(float2(fragCoord.x, fragCoord.y - boRes.y / 10.), v, boRes.x * BO_RIGHT, y0, h, kind > 1.5 ? 1. : 0.);
     float hot = kind > .5 && kind < 1.5 && v > -70. && v >= audioLow.w ? 1. : 0.;
     float clip = kind > 1.5 && v >= 0. ? 1. : 0.;
     float3 txt = float3(.72, .72, .72);

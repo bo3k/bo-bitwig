@@ -63,16 +63,17 @@ def bo_spectrum() -> Device:
         x = GX + (band_of(hz) + 0.5) * BAND_W
         dev.labels.append((text, (max(0, round(x) - 3), GY + GH, 6, 4), 6, 1, FONT_BOLD))
     row1, row2 = GY + GH + 6, GY + GH + 12
-    dev.choice("slope", "Slope", ["0 dB", "3 dB", "4.5 dB"], default=2, rect=(GX, row1, 28, 5),
+    dev.choice("slope", "Slope", ["0 dB", "3 dB", "4.5 dB"], default=2, rect=(GX + 9, row1, 28, 5),
                buttons=True, tooltip="Tilt of the graph, dB per octave around 1 kHz (as Master Bo's Slope)")
     right = GX + graph_w                       # Display's right edge: View and Mode align to it
     dev.choice("mode", "Mode", ["Stereo", "M/S"], default=0, rect=(right - 13 - 22, row1, 22, 5), buttons=True,
                tooltip="Stereo: the stereo signal (orange). M/S: mid (orange) and side (blue)")
-    dev.choice("view", "View", ["Plot", "1/3 Oct."], default=1, rect=(right - 13 - 22, row2, 22, 5), buttons=True,
-               tooltip="Plot: a curve through the bands. 1/3 Oct.: the 31 bands as bars")
+    dev.choice("view", "View", ["Plot", "Bars"], default=1, rect=(right - 13 - 22, row2, 22, 5), buttons=True,
+               tooltip="Plot: a curve through the bands. Bars: the 31 bands as bars")
     dev.toggle("hold", "Hold", default=False, button=None,     # not on the panel: hold_time 0 is Off
                tooltip="Peak hold (no longer used by the DSP; kept for bo Master's settings sync)")
     dev.labels.append(("Hold", (GX, row2 + 1, 8, 4), 6, 1, FONT_BOLD))
+    dev.labels.append(("Slope", (GX, row1 + 1, 8, 4), 6, 1, FONT_BOLD))
     dev.choice("hold_time", "Hold time", ["Off", "1 s", "3 s", "10 s", "\u221e"], default=0, rect=(GX + 9, row2, 32, 5),
                buttons=True, tooltip="Peak hold: each band's highest level, kept this long, then falling (Off: no hold)")
     dev.toggle("show", "Display", default=True, button=None,  # not on the panel any more: always on

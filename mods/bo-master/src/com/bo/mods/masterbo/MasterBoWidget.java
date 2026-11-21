@@ -692,7 +692,7 @@ final class MasterBoWidget extends dve implements drv {
             slopeHits.add(new double[] {tx - eLY(4), sTop, mw + eLY(8), strip, 1});
             tx += mw + eLY(12);
         }
-        String reading = model.thirdOctave ? "1/3 Oct" : "Plot";
+        String reading = model.thirdOctave ? "Bars" : "Plot";
         double rw = small.cfM(reading).IwV();
         if (tx + rw <= specX + specW - eLY(4) - switchW) {
             text(g, small, tx, base, reading, orange);
@@ -1763,7 +1763,7 @@ final class MasterBoWidget extends dve implements drv {
         rect(g, 0, Math.round(top), Sxo(), yiX() - Math.round(top), themeGrey("Grey 1", 26, "Grey 2", 38, 9 / 12.0)); // 35 in the default theme
         double faderRight = faderX + eLY(FADER_WIDTH);
         if (!(stripGroupX >= panX - 1 && faderRight <= panX + panW + 1)) return; // the strip is not under the pan
-        double m = eLY(4);
+        double m = Math.max(1, Math.round(eLY(1))); // the dark box's border around the strip: 1 px (at 100 %)
         double l = Math.round(Math.min(panX, stripGroupX) - m), r = Math.round(Math.max(panX + panW, faderRight) + m);
         double t = Math.round(panY - eLY(16) - m);
         rect(g, l, t, r - l, yiX() - t - eLY(2), theme("Grey 1", iok.cfM(26, 26, 26)));

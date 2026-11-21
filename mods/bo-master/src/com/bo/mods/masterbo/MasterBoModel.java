@@ -612,9 +612,9 @@ final class MasterBoModel {
     private long lufsLogAt;
 
     /**
-     * The value each oscilloscope input carries: M and S from one, I and TP (+ 1000) from the other.
-     * The inputs are steady, so every filled sample holds the value; the median of the non-zero
-     * samples ignores a part of the buffer that isn't filled yet.
+     * The value each oscilloscope input carries: M and S from one, I and TP from the other, sent as
+     * +-(value + 200) (TP + 1200) with the sign flipping every sample, as an oscilloscope only records
+     * a signal that crosses zero. The median size of the non-zero samples ignores an unfilled part.
      */
     private void readLufsScopes() {
         long now = System.currentTimeMillis();
@@ -627,23 +627,23 @@ final class MasterBoModel {
                 Object data = osc.FzB(); // FzB(): the oscilloscope's data (its two sample buffers)
                 if (!(data instanceof bitwig.obf.nng d)) { if (log) debug("lufs scope " + n + ": no data (" + (data == null ? "null" : data.getClass().getSimpleName()) + ")"); continue; }
                 float[] a = d.cfM(), b = d.FzB(); // cfM(): input A; FzB(): input B
-                double va = steady(a), vb = steady(b);
+                double va = steady(a), vb = steady(b);   // sizes: the signals flip sign every sample
                 if (log) debug("lufs scope " + n + ": A " + describe(a) + " -> " + va + ", B " + describe(b) + " -> " + vb);
                 if (Double.isNaN(va) || Double.isNaN(vb)) continue;
-                if (vb > 500) { lufs[2] = va; lufs[3] = vb - 1000; } // the second: I, TP
-                else { lufs[0] = va; lufs[1] = vb; }                 // the first: M, S
+                if (vb > 700) { lufs[2] = va - 200; lufs[3] = vb - 1200; } // the second: I, TP (+ 1200)
+                else { lufs[0] = va - 200; lufs[1] = vb - 200; }           // the first: M, S (+ 200)
             } catch (Throwable failure) {
                 debug("lufs read failed: " + failure);
             }
         }
     }
 
-    /** The median of a buffer's finite, non-zero samples; NaN if it has none. */
+    /** The median size of a buffer's finite, non-zero samples; NaN if it has none. */
     private static double steady(float[] x) {
         if (x == null) return Double.NaN;
         float[] v = new float[x.length];
         int k = 0;
-        for (float f : x) if (f != 0 && Float.isFinite(f)) v[k++] = f;
+        for (float f : x) if (f != 0 && Float.isFinite(f)) v[k++] = Math.abs(f);
         if (k == 0) return Double.NaN;
         java.util.Arrays.sort(v, 0, k);
         return v[k / 2];
@@ -936,7 +936,7 @@ final class MasterBoModel {
         return switch (i) {
             case 0 -> slopeChoice;
             case 1 -> msMode ? 1 : 0;
-            case 2 -> thirdOctave ? 1 : 0;   // the device: 0 Plot, 1 1/3 Oct.
+            case 2 -> thirdOctave ? 1 : 0;   // the device: 0 Plot, 1 Bars
             case 3 -> holdOn ? 1 : 0;       // the device's old Hold switch (its DSP now goes by the hold time)
             default -> holdOn ? holdChoice + 1 : 0; // the device: 0 Off, 1 .. 4 = 1 s, 3 s, 10 s, for ever
         };
