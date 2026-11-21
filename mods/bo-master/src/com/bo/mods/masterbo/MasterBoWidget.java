@@ -1296,7 +1296,7 @@ final class MasterBoWidget extends dve implements drv {
         if (!model.hasMaster()) {
             g.cfM(eLY(PAD), eLY(PAD) + ascent, "No project", text.cfM(0.5F));
         } else {
-            paintLowerBackground(g);
+            paintLowerBackground(g, ascent);
             paintVu(g, font, text, ascent);
             paintSpectrum(g, font, text, ascent);
             paintHeader(g, font, text, ascent);
@@ -1758,15 +1758,22 @@ final class MasterBoWidget extends dve implements drv {
      * Under the big meters (or the header, without them) to the bottom: (35, 35, 35); behind the pan,
      * the scale, the meters and the fader: (26, 26, 26), from the PAN label down.
      */
-    private void paintLowerBackground(SYo g) {
+    private void paintLowerBackground(SYo g, double ascent) {
         double top = bigH > 0 ? bigY + bigH + eLY(3) : headerY + eLY(HEADER) + eLY(3);
         rect(g, 0, Math.round(top), Sxo(), yiX() - Math.round(top), themeGrey("Grey 1", 26, "Grey 2", 38, 9 / 12.0)); // 35 in the default theme
         double faderRight = faderX + eLY(FADER_WIDTH);
         if (!(stripGroupX >= panX - 1 && faderRight <= panX + panW + 1)) return; // the strip is not under the pan
-        double m = Math.max(1, Math.round(eLY(1))); // the dark box's border around the strip: 1 px (at 100 %)
-        double l = Math.round(Math.min(panX, stripGroupX) - m), r = Math.round(Math.max(panX + panW, faderRight) + m);
-        double t = Math.round(panY - eLY(16) - m);
-        rect(g, l, t, r - l, yiX() - t - eLY(2), theme("Grey 1", iok.cfM(26, 26, 26)));
+        // the dark box exactly around the strip (from the PAN label to the scale's bottom), no margin,
+        // with a 1 px outline in the theme's darkest grey (near black) just outside it
+        double l = Math.round(Math.min(panX, stripGroupX)), r = Math.round(Math.max(panX + panW, faderRight));
+        double t = Math.round(panY - eLY(4) - ascent - eLY(1));
+        double b = Math.round(Math.max(stripY + stripH, scaleBottom + ascent / 2 + eLY(1)));
+        rect(g, l, t, r - l, b - t, theme("Grey 1", iok.cfM(26, 26, 26)));
+        iok outline = theme("Grey 0", iok.cfM(15, 15, 15));
+        rect(g, l - 1, t - 1, r - l + 2, 1, outline);
+        rect(g, l - 1, b, r - l + 2, 1, outline);
+        rect(g, l - 1, t, 1, b - t, outline);
+        rect(g, r, t, 1, b - t, outline);
         // cut into three, as Bitwig's mixer: the pan | the readouts | the meters and the fader
         iok cut = themeGrey("Grey 1", 26, "Grey 2", 38, 9 / 12.0);
         double panBottom = panY + eLY(PAN_HEIGHT);
