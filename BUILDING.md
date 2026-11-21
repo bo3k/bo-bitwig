@@ -34,6 +34,10 @@ Build scripts are in each device's `source/` folder: Python 3.10+, and [bitwig-n
 - **bo Curve:** `python build_bo_sat.py` writes `out/bo Curve.bwdevice`; then `python ../../../tools/device-gen/theme_greys.py curve "out/bo Curve.bwdevice" "../bo Curve.bwdevice"` gives the file in the repo. The Vintage skin's images are made from the renders in `satv5/` with `python make_sat_background.py satv5`.
 - **bo Safety, bo LUFS, bo Spectrum, bo Scope:** their scripts need a newer generator than `tools/device-gen/bwgen.py` (trigger buttons, value readouts, Bitwig's scope and spectrum displays). It isn't in the repo yet; the `.bwdevice` files are the current builds.
 
+### bo LUFS's values for bo Master
+
+`tools/device-gen/lufs_scopes.py` gives bo LUFS two of Bitwig's oscilloscopes, fed by four audio outputs of its DSP (M and S, I and TP), which bo Master reads. It used to pass them through hidden readout parameters, but a value the DSP sends to a parameter is an undoable change in Bitwig, ten a second. Run it after `theme_greys.py`; the `.bwdevice` in the repo has both.
+
 ### Theme greys
 
 `tools/device-gen/theme_greys.py <device> <in> <out>` makes a built device's greys follow Bitwig's theme (`lufs`, `spectrum`, `scope`, `safety`, `curve`, `magnetic`). A drawing can't read the theme, so each grey is drawn as black or white over what Bitwig draws under it; in the default theme it looks exactly as before. Hidden reset buttons become borderless, and bo Curve's Bitwig skin gets its own themed graph. Run it on a fresh build; the `.bwdevice` files in the repo are already patched.

@@ -462,6 +462,11 @@ final class MasterBoModel {
     private final Dgc[] lufsFields = new Dgc[4];
     private Dgc lufsRefField;
     private oDc lufsTrigger;     // its Reset trigger (a trigger_atom)
+    // bo LUFS's values as steady signals in two of Bitwig's oscilloscopes: the first M (A) and S (B), the
+    // second I (A) and TP max + 1000 (B). Older bo LUFS versions wrote readout parameters instead (lufsFields),
+    // which Bitwig recorded as undoable changes ten times a second.
+    private final List<bitwig.obf.anM> lufsScopes = new ArrayList<>();
+    private final List<bitwig.obf.tF> lufsStreams = new ArrayList<>();
     private long lufsSearchAt;
     private static final int TRIGGER_CLICK = 618; // trigger_atom's "click" action (field id)
 
@@ -481,7 +486,8 @@ final class MasterBoModel {
             }
         }
         if (!lufsFound) return;
-        for (int i = 0; i < 4; i++) lufs[i] = number(lufsFields[i], -100);
+        if (lufsScopes.size() >= 2) readLufsScopes();
+        else for (int i = 0; i < 4; i++) lufs[i] = number(lufsFields[i], -100);
         lufsRef = number(lufsRefField, -14);
     }
 
@@ -500,7 +506,7 @@ final class MasterBoModel {
         lufsTrigger = null;
         lufsFound = false;
         pHd project = window.mtS();
-        if (project == null) return;
+        if (project == null) { unbindLufsScopes(); return; }
         List<RYd> channels = new ArrayList<>();
         if (master != null) channels.add(master);
         kWY root = project.VpW();
@@ -514,6 +520,7 @@ final class MasterBoModel {
                 if (bindLufs(device.OzW())) return;
             }
         }
+        unbindLufsScopes();
     }
 
     /** Whether a device's name starts with this one in any case ("bo LUFS", or "BO LUFS" before the rename). */
@@ -535,6 +542,7 @@ final class MasterBoModel {
     /** Looks through the device's objects (a few levels) for its readout atoms and its Ref.LUFS knob. */
     private boolean bindLufs(Object inner) {
         if (!(inner instanceof oDc start)) return false;
+        List<bitwig.obf.anM> scopesFound = new ArrayList<>();
         java.util.ArrayDeque<oDc> queue = new java.util.ArrayDeque<>();
         java.util.Set<oDc> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         java.util.Map<oDc, Integer> depth = new java.util.IdentityHashMap<>();
@@ -551,6 +559,7 @@ final class MasterBoModel {
                 if (name.equals("Ref.LUFS")) lufsRefField = valueField(o);
             }
             if (fieldText(o, "trigger_toggle") != null) lufsTrigger = o; // the device's one trigger: Reset
+            if (o instanceof bitwig.obf.anM osc) scopesFound.add(osc);   // its oscilloscopes, in order
             int d = depth.get(o);
             if (d >= 4) continue;
             for (Object field : o.nWt()) { // nWt(): the object's fields
@@ -565,8 +574,57 @@ final class MasterBoModel {
                 }
             }
         }
-        lufsFound = lufsFields[0] != null && lufsFields[1] != null && lufsFields[2] != null && lufsFields[3] != null;
+        if (scopesFound.size() >= 2) bindLufsScopes(scopesFound);
+        else unbindLufsScopes();
+        lufsFound = lufsScopes.size() >= 2
+                || (lufsFields[0] != null && lufsFields[1] != null && lufsFields[2] != null && lufsFields[3] != null);
         return lufsFound;
+    }
+
+    /** Starts the oscilloscopes' data streams (as Bitwig's scope display does), unless they are the ones already running. */
+    private void bindLufsScopes(List<bitwig.obf.anM> found) {
+        if (found.size() == lufsScopes.size()) {
+            boolean same = true;
+            for (int i = 0; i < found.size(); i++) same &= found.get(i) == lufsScopes.get(i);
+            if (same) return;
+        }
+        unbindLufsScopes();
+        for (bitwig.obf.anM osc : found) {
+            lufsScopes.add(osc);
+            bitwig.obf.tF stream = osc.iCS(); // iCS(): the engine's stream of its data
+            if (stream != null) stream.cfM(); // cfM(): start
+            lufsStreams.add(stream);
+        }
+        debug("lufs: bound " + found.size() + " oscilloscopes");
+    }
+
+    private void unbindLufsScopes() {
+        for (bitwig.obf.tF stream : lufsStreams) {
+            try {
+                if (stream != null) stream.FzB(); // FzB(): stop
+            } catch (Throwable ignored) {
+            }
+        }
+        lufsStreams.clear();
+        lufsScopes.clear();
+    }
+
+    /** The newest sample of each oscilloscope input: M and S from one, I and TP (+ 1000) from the other. */
+    private void readLufsScopes() {
+        for (bitwig.obf.anM osc : lufsScopes) {
+            try {
+                Object data = osc.FzB(); // FzB(): the oscilloscope's data (its two sample buffers)
+                if (!(data instanceof bitwig.obf.nng d)) continue;
+                float[] a = d.cfM(), b = d.FzB(); // cfM(): input A; FzB(): input B
+                if (a == null || b == null || a.length == 0 || b.length == 0) continue;
+                double va = a[a.length - 1], vb = b[b.length - 1];
+                if (!Double.isFinite(va) || !Double.isFinite(vb)) continue;
+                if (vb > 500) { lufs[2] = va; lufs[3] = vb - 1000; } // the second: I, TP
+                else { lufs[0] = va; lufs[1] = vb; }                 // the first: M, S
+            } catch (Throwable failure) {
+                debug("lufs read failed: " + failure);
+            }
+        }
     }
 
     // ---------- The master's own solo and mute (its mixer module's "solo" field and "mute" atom) ----------
