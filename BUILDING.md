@@ -50,7 +50,7 @@ No Bitwig button style draws nothing, and a hidden button takes no clicks (`tool
 
 One release holds everything, with the same file names every time, so the download links in the READMEs (`releases/latest/download/<file>`) always point at the newest files:
 
-`bo-master.zip`, `panels-framework.zip`, `save-incrementally.zip`, `insert-device-via-shortcut.zip`, `bo-Curve.bwdevice`, `bo-Safety.bwdevice`, `bo-LUFS.bwdevice`, `bo-Spectrum.bwdevice`, `bo-Scope.bwdevice` `bo-devices.zip` (all five, with their real names) and `bo-master-devices.zip` (bo LUFS, bo Spectrum and bo Scope).
+`bo-master.zip`, `panels-framework.zip`, `save-incrementally.zip`, `insert-device-via-shortcut.zip`, `bo-Curve.bwdevice`, `bo-Safety.bwdevice`, `bo-LUFS.bwdevice`, `bo-Spectrum.bwdevice`, `bo-Scope.bwdevice`, `bo-devices.zip` (all five, with their real names) and `bo-master-devices.zip` (bo LUFS, bo Spectrum and bo Scope).
 
 A release must not be marked as a pre-release, or `latest` skips it. The mods' versions are inside the mods (Patchbay shows them), not in the file names.
 
