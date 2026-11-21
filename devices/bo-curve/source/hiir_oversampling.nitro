@@ -1,0 +1,174 @@
+// 1x / 2x / 4x half-band oversampling (HIIR polyphase allpass halfband filters), as two parts that
+// build_bo_sat.py splices into bo Curve's code.
+// ---- members ----
+    // oversampling: half-band coefficients and allpass states [channel * n + i]
+    i32 os_now = -1;
+    i32 os_old = 0;                // switching: the previous path, faded out over XF samples
+    i32 xf_n = 0;
+    i32 xf_on = 0;
+    i32 init_magic = 0;           // set once in process: neither reset nor member initialisers are relied on
+    f32[8] ca;
+    f32[4] cb;
+    f32[32] upa_x;
+    f32[32] upa_y;
+    f32[32] dna_x;
+    f32[32] dna_y;
+    f32[8] upb_x;
+    f32[8] upb_y;
+    f32[8] dnb_x;
+    f32[8] dnb_y;
+    f32 up_0 = 0.0;
+    f32 up_1 = 0.0;
+// ---- functions ----
+    // HIIR 2x upsampler, stage A (8 coefficients): writes up_0, up_1
+    void up_a(i32 o, f32 v)
+    {
+        f32 even = v;
+        f32 odd = v;
+        for (i32 j = 0; (j < 4); ++j)
+        {
+            i32 i = 2 * j;
+            f32 t0 = (even - upa_y[o + i]) * ca[i] + upa_x[o + i];
+            upa_x[o + i] = even;
+            upa_y[o + i] = t0;
+            even = t0;
+            f32 t1 = (odd - upa_y[o + i + 1]) * ca[i + 1] + upa_x[o + i + 1];
+            upa_x[o + i + 1] = odd;
+            upa_y[o + i + 1] = t1;
+            odd = t1;
+        }
+        up_0 = even;
+        up_1 = odd;
+    }
+
+    f32 down_a(i32 o, f32 a, f32 b)
+    {
+        f32 s0 = b;
+        f32 s1 = a;
+        for (i32 j = 0; (j < 4); ++j)
+        {
+            i32 i = 2 * j;
+            f32 t0 = (s0 - dna_y[o + i]) * ca[i] + dna_x[o + i];
+            dna_x[o + i] = s0;
+            dna_y[o + i] = t0;
+            s0 = t0;
+            f32 t1 = (s1 - dna_y[o + i + 1]) * ca[i + 1] + dna_x[o + i + 1];
+            dna_x[o + i + 1] = s1;
+            dna_y[o + i + 1] = t1;
+            s1 = t1;
+        }
+        return 0.5 * (s0 + s1);
+    }
+
+    // stage B (4 coefficients), 2x -> 4x
+    void up_b(i32 ch, f32 v)
+    {
+        f32 even = v;
+        f32 odd = v;
+        i32 o = ch * 4;
+        for (i32 j = 0; (j < 2); ++j)
+        {
+            i32 i = 2 * j;
+            f32 t0 = (even - upb_y[o + i]) * cb[i] + upb_x[o + i];
+            upb_x[o + i] = even;
+            upb_y[o + i] = t0;
+            even = t0;
+            f32 t1 = (odd - upb_y[o + i + 1]) * cb[i + 1] + upb_x[o + i + 1];
+            upb_x[o + i + 1] = odd;
+            upb_y[o + i + 1] = t1;
+            odd = t1;
+        }
+        up_0 = even;
+        up_1 = odd;
+    }
+
+    f32 down_b(i32 ch, f32 a, f32 b)
+    {
+        f32 s0 = b;
+        f32 s1 = a;
+        i32 o = ch * 4;
+        for (i32 j = 0; (j < 2); ++j)
+        {
+            i32 i = 2 * j;
+            f32 t0 = (s0 - dnb_y[o + i]) * cb[i] + dnb_x[o + i];
+            dnb_x[o + i] = s0;
+            dnb_y[o + i] = t0;
+            s0 = t0;
+            f32 t1 = (s1 - dnb_y[o + i + 1]) * cb[i + 1] + dnb_x[o + i + 1];
+            dnb_x[o + i + 1] = s1;
+            dnb_y[o + i + 1] = t1;
+            s1 = t1;
+        }
+        return 0.5 * (s0 + s1);
+    }
+
+    // half-band allpass coefficients (os/hiir_design.py): stage A 8, stage B 4
+    void set_os_coefs()
+    {
+        ca[0] = 0.039731081211079274;
+        ca[1] = 0.1474421552465335;
+        ca[2] = 0.29545647816383785;
+        ca[3] = 0.4541324830524552;
+        ca[4] = 0.6027873484946391;
+        ca[5] = 0.7327846359108521;
+        ca[6] = 0.845343614211982;
+        ca[7] = 0.9483093249579164;
+        cb[0] = 0.06189510863377034;
+        cb[1] = 0.23164302543011617;
+        cb[2] = 0.47917722802656126;
+        cb[3] = 0.7983462940088427;
+    }
+
+    void clear_os()
+    {
+        for (i32 i = 0; (i < 32); ++i)
+        {
+            upa_x[i] = 0.0;
+            upa_y[i] = 0.0;
+            dna_x[i] = 0.0;
+            dna_y[i] = 0.0;
+        }
+        for (i32 j = 0; (j < 8); ++j)
+        {
+            upb_x[j] = 0.0;
+            upb_y[j] = 0.0;
+            dnb_x[j] = 0.0;
+            dnb_y[j] = 0.0;
+        }
+    }
+
+    // clear the filter states of one path (1 = 2x, 2 = 4x) before it fades in
+    void clear_path(i32 p)
+    {
+        i32 base = (p - 1) * 16;
+        for (i32 i = 0; (i < 16); ++i)
+        {
+            upa_x[base + i] = 0.0;
+            upa_y[base + i] = 0.0;
+            dna_x[base + i] = 0.0;
+            dna_y[base + i] = 0.0;
+        }
+        if (p == 2)
+        {
+            for (i32 j = 0; (j < 8); ++j)
+            {
+                upb_x[j] = 0.0;
+                upb_y[j] = 0.0;
+                dnb_x[j] = 0.0;
+                dnb_y[j] = 0.0;
+            }
+        }
+    }
+
+    // once per sample: advance an oversampling switch (64 samples warm-up, then a 512-sample crossfade)
+    void os_tick()
+    {
+        if (xf_on == 1)
+        {
+            xf_n = xf_n + 1;
+            if (xf_n >= 576)
+                xf_on = 0;
+        }
+    }
+
+// ---- end ----

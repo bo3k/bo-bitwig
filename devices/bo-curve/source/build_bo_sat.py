@@ -12,11 +12,10 @@ from bwgen import Device, Domain, Origin, ButtonStyle  # noqa: E402
 
 
 def with_oversampling(nitro: str) -> str:
-    """Add BO Magnetic's 1x / 2x / 4x half-band oversampling (HIIR, see os/hiir_design.py) around the
-    curve. The allpass code is taken from bo_magnetic.nitro, so both devices share one implementation."""
-    mag = (HERE / "bo_magnetic.nitro").read_text()
-    members = mag[mag.index("    // oversampling: half-band"):mag.index("    f32 up_1 = 0.0;\n") + len("    f32 up_1 = 0.0;\n")]
-    funcs = mag[mag.index("    // HIIR 2x upsampler"):mag.index("    // the curve at 1x / 2x / 4x")]
+    """Add 1x / 2x / 4x half-band oversampling (HIIR, from hiir_oversampling.nitro) around the curve."""
+    os_code = (HERE / "hiir_oversampling.nitro").read_text()
+    members = os_code[os_code.index("// ---- members ----\n") + len("// ---- members ----\n"):os_code.index("// ---- functions ----\n")]
+    funcs = os_code[os_code.index("// ---- functions ----\n") + len("// ---- functions ----\n"):os_code.index("// ---- end ----\n")]
 
     def sub(old, new):
         nonlocal nitro
