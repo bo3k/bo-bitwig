@@ -17,6 +17,9 @@ Mods and devices for Bitwig Studio. They run with the Patchbay mod loader (BML) 
 
 ### [bo Master](mods/bo-master)
 
+<!-- placeholder: to be replaced by the bo Master video -->
+<img src="mods/bo-master/media/bo-master-in-bitwig.png" alt="bo Master beside the Arranger in Bitwig" width="720">
+
 The master track's strip pinned on the right side, solo or next to Bitwig's Browser: VU meter, loudness, spectrum, goniometer, fader, pan and the master's plug-ins.
 Master is always visible, also in Edit or Arranger view. It supports the Insert FX handling, Track Remotes and display of the dedicated bo Bitwig devices for metering.
 The devices have to be download and installed from the links below.
