@@ -10,6 +10,6 @@ Native Bitwig devices. Put the `.bwdevice` files in a folder and add that folder
 | <img src="bo-spectrum/media/bo-spectrum.png" width="220"> | [bo Spectrum](bo-spectrum) | 31-band spectrum | [bo-Spectrum.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Spectrum.bwdevice) |
 | <img src="bo-scope/media/bo-scope.png" width="100"> | [bo Scope](bo-scope) | Goniometer and correlation meter | [bo-Scope.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Scope.bwdevice) |
 
-**All five in one:** [bo-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-devices.zip)
+**All five in one:** [bo-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-devices.zip) · **bo Master devices** (LUFS, Spectrum, Scope): [bo-master-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master-devices.zip)
 
 bo LUFS, bo Spectrum and bo Scope also feed the meters of the [bo Master](../mods/bo-master) panel.
