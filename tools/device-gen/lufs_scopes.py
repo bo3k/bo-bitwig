@@ -42,6 +42,22 @@ def main(lufs_path, scope_path, nitro_path, out_path):
         pos = osc.get(0x1832).get(0x264)                      # where it sits in the device's editor
         pos.field(0x11).value = (1000 + 200 * n).to_bytes(len(pos.field(0x11).value), "big")
         atoms.append(osc)
+    # the device graph's list of the Nitro atom's outputs (name, channels, number, kind), which Bitwig
+    # wires by: it must match the code's order, or connections go to the wrong port or are dropped
+    holder = next(o for o in walk(root) if o.get(0x3D8D, None) is not None)
+    outs = holder.get(0x3D8D)
+    by_name = {o.get_str(0x216D): o for o in outs}
+    assert [o.get_str(0x216D) for o in outs] == ["out", "ui_a", "ui_b", "m_val", "s_val", "i_val", "tp_val"], "unexpected outputs"
+    new_outs = [by_name["out"], by_name["ui_a"], by_name["ui_b"]]
+    for name in ("bm_a", "bm_b", "bm_c", "bm_d"):
+        d = clone(by_name["ui_a"])                          # an audio-rate output (kind 1)
+        d.set_str(0x216D, name)
+        d.field(0x216F).value = (1).to_bytes(len(d.field(0x216F).value), "big")   # one channel
+        new_outs.append(d)
+    new_outs += [by_name[n] for n in ("m_val", "s_val", "i_val", "tp_val")]
+    for i, d in enumerate(new_outs):
+        d.field(0x2170).value = i.to_bytes(len(d.field(0x2170).value), "big")
+    outs[:] = new_outs
     for o in walk(root):
         if o.cls == 0x7F5:                                   # settable_decimal_value_atom: the old readouts
             for conn in o.get(0x1832).get(0x266):

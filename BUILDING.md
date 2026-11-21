@@ -40,7 +40,7 @@ Build scripts are in each device's `source/` folder: Python 3.10+, and [bitwig-n
 
 ### Reset buttons
 
-No Bitwig button style draws nothing, and a hidden button takes no clicks (`tools/device-gen` has no test for it; it was checked in Bitwig with a test device). `reset_buttons.py lufs|spectrum <in> <out>` keeps bo LUFS's reset buttons only under its readouts, whose dark boxes cover them, and gives bo Spectrum an ordinary Reset button.
+No Bitwig button style draws nothing, and a hidden button takes no clicks (`tools/device-gen` has no test for it; it was checked in Bitwig with a test device). `reset_buttons.py lufs|spectrum <in> <out>` keeps bo LUFS's reset buttons only under its readouts, whose dark boxes cover them, and gives bo Spectrum an ordinary Reset button. `spectrum_layout.py <in> <new nitro> <out>` then lays out bo Spectrum's bottom rows (Hold label with Off, Plot / 1/3 Oct. under Stereo / M/S, a square Reset at the right) and changes its DSP to match.
 
 ### Theme greys
 

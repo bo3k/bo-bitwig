@@ -10,7 +10,7 @@
 //   M/S (mode 1): mid (L + R) / 2 and side (L - R) / 2 through the bank, each 10 log10(2 ms)
 //                 (full-scale mono = 0 dB on mid)
 // "Display" off: the filter bank stops (the analysers for Master Bo go on).
-// Peak hold (the Hold button, on the stereo or mid level): each band's highest level, kept for the
+// Peak hold (hold_time 1 .. 4 = 1 s, 3 s, 10 s, for ever; 0 = Off; on the stereo or mid level): each band's highest level, kept for the
 // hold time (1, 3, 10 s or for ever), then falling 12 dB/s.
 // The panel's four drawings get 12 values each (sp0..2, sp3..5, sp6..8, sp9..11): the band before the
 // drawing's first, its own bands (8, the last 7), the band after it, a spare, the state: -1 off, else the
@@ -50,8 +50,8 @@ struct bo_spectrum
     }
     value_inport<i32> slope;
     value_inport<i32> mode;
-    value_inport<i32> view;
-    value_inport<bool> hold;
+    value_inport<i32> view;         // 0 Plot, 1 third-octave bars
+    value_inport<bool> hold;        // no longer used: hold_time 0 is Off (kept for bo Master's settings sync)
     value_inport<i32> hold_time;
 
     f64[31] b0;
@@ -221,13 +221,13 @@ struct bo_spectrum
             {
                 count = 0;
                 i32 hold_n = 0;   // samples to hold (0: for ever)
-                if (hold_time == 0)
-                    hold_n = cast(rate64, i32);
                 if (hold_time == 1)
-                    hold_n = cast(3.0 * rate64, i32);
+                    hold_n = cast(rate64, i32);
                 if (hold_time == 2)
+                    hold_n = cast(3.0 * rate64, i32);
+                if (hold_time == 3)
                     hold_n = cast(10.0 * rate64, i32);
-                levels(mode == 1, hold, hold_n, view == 1);
+                levels(mode == 1, hold_time > 0, hold_n, view == 0);
             }
             sl = 0.0;
             if (slope == 1)
@@ -236,7 +236,7 @@ struct bo_spectrum
                 sl = 4.5;
             if (mode == 1)
                 sl = sl + 10.0;
-            if (view == 1)
+            if (view == 0)
                 sl = sl + 20.0;
         }
         sp0[0] = 16777215.0;

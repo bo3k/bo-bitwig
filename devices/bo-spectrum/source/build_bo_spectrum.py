@@ -66,24 +66,21 @@ def bo_spectrum() -> Device:
     dev.choice("slope", "Slope", ["0 dB", "3 dB", "4.5 dB"], default=2, rect=(GX, row1, 28, 5),
                buttons=True, tooltip="Tilt of the graph, dB per octave around 1 kHz (as Master Bo's Slope)")
     right = GX + graph_w                       # Display's right edge: View and Mode align to it
-    dev.choice("mode", "Mode", ["Stereo", "M/S"], default=0, rect=(right - 18 - 2 - 22, row1, 22, 5), buttons=True,
+    dev.choice("mode", "Mode", ["Stereo", "M/S"], default=0, rect=(right - 13 - 22, row1, 22, 5), buttons=True,
                tooltip="Stereo: the stereo signal (orange). M/S: mid (orange) and side (blue)")
-    dev.choice("view", "View", ["Bars", "Plot"], default=0, rect=(right - 18, row1, 18, 5), buttons=True,
-               tooltip="Bars: the 31 bands as bars. Plot: a curve through them")
-    dev.toggle("hold", "Hold", default=False, button=(GX, row2, 11, 5),
-               tooltip="Peak hold: each band's highest level, kept for the hold time, then falling")
-    dev.choice("hold_time", "Hold time", ["1 s", "3 s", "10 s", "\u221e"], default=1, rect=(GX + 13, row2, 26, 5),
-               buttons=True, tooltip="How long the peak hold keeps a level (\u221e: until Hold is switched off)")
-    dev.toggle("show", "Display", default=True, button=(GX + graph_w - 14, row2, 14, 5),
+    dev.choice("view", "View", ["Plot", "1/3 Oct."], default=1, rect=(right - 13 - 22, row2, 22, 5), buttons=True,
+               tooltip="Plot: a curve through the bands. 1/3 Oct.: the 31 bands as bars")
+    dev.toggle("hold", "Hold", default=False, button=None,     # not on the panel: hold_time 0 is Off
+               tooltip="Peak hold (no longer used by the DSP; kept for bo Master's settings sync)")
+    dev.labels.append(("Hold", (GX, row2 + 1, 8, 4), 6, 1, FONT_BOLD))
+    dev.choice("hold_time", "Hold time", ["Off", "1 s", "3 s", "10 s", "\u221e"], default=0, rect=(GX + 9, row2, 32, 5),
+               buttons=True, tooltip="Peak hold: each band's highest level, kept this long, then falling (Off: no hold)")
+    dev.toggle("show", "Display", default=True, button=None,  # not on the panel any more: always on
                tooltip="Draw the spectrum here. Off: only this panel stops; Master Bo's spectrum goes on")
-    # a click on the dB scale (right of the graph) or the frequency row (under it) resets the levels and holds
-    zones = [(GX + graph_w, GY, 8, GH + 1), (GX, GY + GH, graph_w + 8, 5)]
-    dev.triggers.append(Trigger("reset_btn", "", zones,
-                                tooltip="Click the scales to reset the spectrum (levels and peak hold)", style=2))
-    # the buttons stay invisible: drawings in the panel's grey on top of them (clicks go through overlays)
-    for i, z in enumerate(zones):
-        dev.display((HERE / "spectrum" / "bo_spectrum_cover.sksl").read_text(), rect=z, inputs=["sp0"],
-                    id=f"BO_SPECTRUM_COVER_{i}", overlay=True)
+    # Reset: a square button two rows high at the graph's right edge (no Bitwig button can be hidden
+    # and still take clicks, so it is an ordinary one)
+    dev.triggers.append(Trigger("reset_btn", "Reset", [(right - 11, row1, 11, 11)],
+                                tooltip="Reset the spectrum: levels and peak hold start again", style=0))
     return dev
 
 

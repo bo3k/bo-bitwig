@@ -936,9 +936,9 @@ final class MasterBoModel {
         return switch (i) {
             case 0 -> slopeChoice;
             case 1 -> msMode ? 1 : 0;
-            case 2 -> thirdOctave ? 0 : 1;   // the device: 0 Bars, 1 Plot
-            case 3 -> holdOn ? 1 : 0;
-            default -> holdChoice;
+            case 2 -> thirdOctave ? 1 : 0;   // the device: 0 Plot, 1 1/3 Oct.
+            case 3 -> holdOn ? 1 : 0;       // the device's old Hold switch (its DSP now goes by the hold time)
+            default -> holdOn ? holdChoice + 1 : 0; // the device: 0 Off, 1 .. 4 = 1 s, 3 s, 10 s, for ever
         };
     }
 
@@ -946,9 +946,12 @@ final class MasterBoModel {
         switch (i) {
             case 0 -> setSlope(v);
             case 1 -> { if ((v == 1) != msMode) toggleMs(); }
-            case 2 -> { if ((v == 0) != thirdOctave) toggleThirdOctave(); }
-            case 3 -> { if ((v == 1) != holdOn) toggleHold(); }
-            default -> { if (v >= 0 && v < HOLD_SECONDS.length && v != holdChoice) { holdChoice = v - 1; nextHoldTime(); } }
+            case 2 -> { if ((v == 1) != thirdOctave) toggleThirdOctave(); }
+            case 3 -> { }                   // the old Hold switch: no button on the device any more
+            default -> {
+                if ((v > 0) != holdOn) toggleHold();
+                if (v > 0 && v <= HOLD_SECONDS.length && v - 1 != holdChoice) { holdChoice = v - 2; nextHoldTime(); }
+            }
         }
     }
 
