@@ -609,22 +609,52 @@ final class MasterBoModel {
         lufsScopes.clear();
     }
 
-    /** The newest sample of each oscilloscope input: M and S from one, I and TP (+ 1000) from the other. */
+    private long lufsLogAt;
+
+    /**
+     * The value each oscilloscope input carries: M and S from one, I and TP (+ 1000) from the other.
+     * The inputs are steady, so every filled sample holds the value; the median of the non-zero
+     * samples ignores a part of the buffer that isn't filled yet.
+     */
     private void readLufsScopes() {
+        long now = System.currentTimeMillis();
+        boolean log = now >= lufsLogAt;
+        if (log) lufsLogAt = now + 10000;
+        int n = 0;
         for (bitwig.obf.anM osc : lufsScopes) {
+            n++;
             try {
                 Object data = osc.FzB(); // FzB(): the oscilloscope's data (its two sample buffers)
-                if (!(data instanceof bitwig.obf.nng d)) continue;
+                if (!(data instanceof bitwig.obf.nng d)) { if (log) debug("lufs scope " + n + ": no data (" + (data == null ? "null" : data.getClass().getSimpleName()) + ")"); continue; }
                 float[] a = d.cfM(), b = d.FzB(); // cfM(): input A; FzB(): input B
-                if (a == null || b == null || a.length == 0 || b.length == 0) continue;
-                double va = a[a.length - 1], vb = b[b.length - 1];
-                if (!Double.isFinite(va) || !Double.isFinite(vb)) continue;
+                double va = steady(a), vb = steady(b);
+                if (log) debug("lufs scope " + n + ": A " + describe(a) + " -> " + va + ", B " + describe(b) + " -> " + vb);
+                if (Double.isNaN(va) || Double.isNaN(vb)) continue;
                 if (vb > 500) { lufs[2] = va; lufs[3] = vb - 1000; } // the second: I, TP
                 else { lufs[0] = va; lufs[1] = vb; }                 // the first: M, S
             } catch (Throwable failure) {
                 debug("lufs read failed: " + failure);
             }
         }
+    }
+
+    /** The median of a buffer's finite, non-zero samples; NaN if it has none. */
+    private static double steady(float[] x) {
+        if (x == null) return Double.NaN;
+        float[] v = new float[x.length];
+        int k = 0;
+        for (float f : x) if (f != 0 && Float.isFinite(f)) v[k++] = f;
+        if (k == 0) return Double.NaN;
+        java.util.Arrays.sort(v, 0, k);
+        return v[k / 2];
+    }
+
+    private static String describe(float[] x) {
+        if (x == null) return "null";
+        float lo = Float.POSITIVE_INFINITY, hi = Float.NEGATIVE_INFINITY;
+        int zeros = 0;
+        for (float f : x) { if (f == 0) zeros++; lo = Math.min(lo, f); hi = Math.max(hi, f); }
+        return x.length + " samples, " + zeros + " zero, " + lo + " .. " + hi + (x.length > 0 ? ", last " + x[x.length - 1] : "");
     }
 
     // ---------- The master's own solo and mute (its mixer module's "solo" field and "mute" atom) ----------
