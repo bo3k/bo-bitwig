@@ -9,7 +9,7 @@ A spectrum in 31 third-octave bands, 20 Hz to 20 kHz. The audio passes untouched
 - **Bars** or **Plot**.
 - **Hold:** peak hold for 1, 3 or 10 seconds, or until you switch it off.
 - **Display:** off stops only this panel; bo Master's spectrum goes on.
-- **Click** the scales to reset.
+- **Reset:** the levels and the peak hold start again.
 
 [bo Master](../../mods/bo-master) shows the same spectrum.
 

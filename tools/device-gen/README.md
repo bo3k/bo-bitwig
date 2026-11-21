@@ -94,4 +94,4 @@ Path("out/My Device.bwdevice").write_bytes(dev.build())
 
 ## Theme greys
 
-`theme_greys.py <device> <in> <out>` makes a built device's greys follow Bitwig's theme (devices: `lufs`, `spectrum`, `scope`, `safety`, `curve`, `magnetic`). A drawing can't read the theme, so each grey is drawn as black or white over what Bitwig draws under it; in the default theme it looks exactly as before. Hidden reset buttons become borderless, and bo Curve's Bitwig skin gets its own themed graph. Run it on a fresh build: the `.bwdevice` files in this repo are already patched.
+`theme_greys.py <device> <in> <out>` makes a built device's greys follow Bitwig's theme (devices: `lufs`, `spectrum`, `scope`, `safety`, `curve`, `magnetic`). A drawing can't read the theme, so each grey is drawn as black or white over what Bitwig draws under it; in the default theme it looks exactly as before. bo Curve's Bitwig skin gets its own themed graph. For the reset buttons, see `reset_buttons.py` in BUILDING.md. Run it on a fresh build: the `.bwdevice` files in this repo are already patched.

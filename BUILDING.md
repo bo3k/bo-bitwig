@@ -38,9 +38,13 @@ Build scripts are in each device's `source/` folder: Python 3.10+, and [bitwig-n
 
 `tools/device-gen/lufs_scopes.py` gives bo LUFS two of Bitwig's oscilloscopes, fed by four audio outputs of its DSP (M and S, I and TP), which bo Master reads. It used to pass them through hidden readout parameters, but a value the DSP sends to a parameter is an undoable change in Bitwig, ten a second. Run it after `theme_greys.py`; the `.bwdevice` in the repo has both.
 
+### Reset buttons
+
+No Bitwig button style draws nothing, and a hidden button takes no clicks (`tools/device-gen` has no test for it; it was checked in Bitwig with a test device). `reset_buttons.py lufs|spectrum <in> <out>` keeps bo LUFS's reset buttons only under its readouts, whose dark boxes cover them, and gives bo Spectrum an ordinary Reset button.
+
 ### Theme greys
 
-`tools/device-gen/theme_greys.py <device> <in> <out>` makes a built device's greys follow Bitwig's theme (`lufs`, `spectrum`, `scope`, `safety`, `curve`, `magnetic`). A drawing can't read the theme, so each grey is drawn as black or white over what Bitwig draws under it; in the default theme it looks exactly as before. Hidden reset buttons become borderless, and bo Curve's Bitwig skin gets its own themed graph. Run it on a fresh build; the `.bwdevice` files in the repo are already patched.
+`tools/device-gen/theme_greys.py <device> <in> <out>` makes a built device's greys follow Bitwig's theme (`lufs`, `spectrum`, `scope`, `safety`, `curve`, `magnetic`). A drawing can't read the theme, so each grey is drawn as black or white over what Bitwig draws under it; in the default theme it looks exactly as before. bo Curve's Bitwig skin gets its own themed graph. Run it on a fresh build; the `.bwdevice` files in the repo are already patched.
 
 ## Releases
 
