@@ -53,7 +53,7 @@ A shortcut for every Bitwig effect and instrument. You choose the keys.
 | [bo Spectrum](devices/bo-spectrum) | 31-band spectrum. Required for bo Master | [bo-Spectrum.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Spectrum.bwdevice) |
 | [bo Scope](devices/bo-scope) | Goniometer and correlation meter. Required for bo Master | [bo-Scope.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Scope.bwdevice) |
 
-**All five in one:** [bo-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-devices.zip) · **bo Master devices** (LUFS, Spectrum, Scope): [bo-master-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master-devices.zip)
+**All five in one:** [bo-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-devices.zip) · ** Three bo Master meter devices** (LUFS, Spectrum, Scope): [bo-master-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master-devices.zip)
 
 ## Install
 
