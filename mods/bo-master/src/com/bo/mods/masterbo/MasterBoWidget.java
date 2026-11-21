@@ -59,7 +59,10 @@ import com.bitwig.graphics.SYo; // Bitwig's drawing surface
  */
 final class MasterBoWidget extends dve implements drv {
     // Sizes in Bitwig's layout units (scaled with the UI, eLY).
-    private static final long PAD = 10;
+    private static final long PAD = 10;          // gaps between the columns (the wide layout)
+    private static final int EDGE = 1;           // the outline around the panel, in pixels
+    private static final long COLOUR_BAR = 4;    // the master's colour bar at the bottom, as Bitwig's mixer
+    private static final long BOTTOM_GAP = 4;    // between the content and the colour bar
     private static final long HEADER = 46; // as tall as Bitwig's own master header in the mixer
     private static final long ROW = 20;
     private static final long PAN_HEIGHT = 18;
@@ -1077,18 +1080,21 @@ final class MasterBoWidget extends dve implements drv {
 
     private void layout() {
         double w = Sxo(), h = yiX(); // Sxo(): width; yiX(): height
-        double pad = eLY(PAD);
+        // the panel as one mixer strip: a 1 px outline (EDGE) at its edges, the header right inside it, the
+        // master's colour bar at the bottom; no margin between the edges and the content
+        double pad = EDGE, gap = eLY(PAD);
+        double bottom = h - EDGE - colourBarH() - eLY(BOTTOM_GAP); // where the content ends
         wide = w > h * 1.1 && w >= eLY(LEFT_MIN) + eLY(STRIP_MIN);
         if (wide) {
-            double left = Math.max(eLY(LEFT_MIN), Math.min(eLY(LEFT_MAX), w * 0.5 - pad));
-            headerX = pad; headerY = 0; headerW = left; // the header right at the top
+            double left = Math.max(eLY(LEFT_MIN), Math.min(eLY(LEFT_MAX), w * 0.5 - gap));
+            headerX = pad; headerY = EDGE; headerW = left; // the header right at the top
             layoutBigIcon();
             vuX = pad; vuW = left; vuH = vuCollapsed ? eLY(VU_BAR) : vuHeight(left, h);
             vuFaceH = vuH; double specBlock = spectrumBlock(vuW, h);
             if (specWithVu()) vuH += specBlock; // the spectrum goes with the VU, right under it
             bigH = bigMode > 0 ? Math.max(eLY(BIG_MIN), Math.min(eLY(BIG_MAX), h * 0.3)) : 0; // no separator here: a share of the height
             double under = stackVuAndBig(headerY + eLY(HEADER) + eLY(6));
-            panX = pad; panW = left; panY = h - pad - eLY(PAN_HEIGHT) - eLY(14);
+            panX = pad; panW = left; panY = bottom - eLY(PAN_HEIGHT) - eLY(14);
             lufsX = pad; lufsW = left; lufsH = model.lufsFound ? eLY(LUFS_H) : 0;
             boolean low = lufsLow && lufsH > 0;
             double abovePan = panY - eLY(18) - msRowH(); // above the pan (and the solo / mute row)
@@ -1103,11 +1109,11 @@ final class MasterBoWidget extends dve implements drv {
             double mostWide = Math.max(0, limitWide - eLY(ROW) - eLY(4) - insertsY);
             insertsH = Math.min(rowsWide * (double) eLY(ROW), Math.floor(mostWide / eLY(ROW)) * eLY(ROW));
             latencyY = insertsY + insertsH + eLY(2);
-            stripX = pad + left + pad * 2; stripY = pad;
-            stripW = Math.max(0, w - stripX - pad); stripH = Math.max(0, h - pad * 2);
+            stripX = pad + left + gap * 2; stripY = headerY + eLY(6);
+            stripW = Math.max(0, w - stripX - pad); stripH = Math.max(0, bottom - stripY);
             separatorY = -1; // no separator: the strip has its own column
         } else {
-            headerX = pad; headerY = 0; headerW = Math.max(0, w - pad * 2); // the header right at the top
+            headerX = pad; headerY = EDGE; headerW = Math.max(0, w - pad * 2); // the header right at the top
             layoutBigIcon();
             vuX = pad; vuW = headerW; vuH = vuCollapsed ? eLY(VU_BAR) : vuHeight(vuW, h);
             vuFaceH = vuH; double specBlock = spectrumBlock(vuW, h);
@@ -1133,26 +1139,26 @@ final class MasterBoWidget extends dve implements drv {
             double bigGap = bigMode > 0 ? eLY(6) : 0;
             double bigDefault = bigMode > 0 ? Math.max(eLY(BIG_MIN), Math.min(eLY(BIG_MAX), h * 0.3)) : 0;
             double bigShortest = bigMode > 0 ? Math.min(bigDefault, eLY(BIG_SHORTEST)) : 0;
-            double room = h - pad - eLY(SEPARATOR) - oneRow - bigShortest - bigGap; // the most the fader section can have
+            double room = bottom - eLY(SEPARATOR) - oneRow - bigShortest - bigGap; // the most the fader section can have
             double wanted = faderHeight > 0 ? faderHeight * unit() : (h - top) * 0.62; // kept in layout units
             double section = Math.max(Math.min(eLY(FADER_MIN) + panBlock, Math.max(0, room)), Math.min(wanted, room));
-            double aboveRoom = h - pad - eLY(SEPARATOR) - section;               // all that is above the separator
+            double aboveRoom = bottom - eLY(SEPARATOR) - section;               // all that is above the separator
             bigH = bigMode > 0 ? Math.max(bigShortest, Math.min(bigDefault, aboveRoom - allOfThem - bigGap)) : 0;
             double under = stackVuAndBig(top);
             lufsY = under + eLY(6); // moved under the separator below, when low
             insertsX = pad; insertsW = headerW; insertsY = low ? under + eLY(8) : lufsY + lufsH + eLY(lufsH > 0 ? 8 : 2);
             macrosH = macrosTopH(headerW); macrosX = pad; macrosW = headerW; macrosY = insertsY;
             insertsY += macrosH;
-            separatorY = h - pad - section - eLY(SEPARATOR);
+            separatorY = bottom - section - eLY(SEPARATOR);
             if (low) lufsY = separatorY - eLY(4) - lufsH; // right above the separator
             if (vuLow) vuY = (low ? lufsY - eLY(6) : separatorY - eLY(4)) - vuH; // above it (and above a low LUFS section)
             if (specBottomAlone()) specY = (low ? lufsY - eLY(6) : separatorY - eLY(4)) - specH;
             panX = pad; panW = headerW; panY = separatorY + eLY(SEPARATOR) + eLY(18) + msRowH();
             stripX = pad; stripY = panY + eLY(PAN_HEIGHT) + eLY(12);
-            stripW = headerW; stripH = Math.max(0, h - pad - stripY);
+            stripW = headerW; stripH = Math.max(0, bottom - stripY);
             if (macrosOn() && macrosLow) { // the remote controls left of the fader section; the pan, meters and fader to the right
                 macrosX = pad; macrosW = Math.round(Math.min(headerW * 0.45, eLY(120)));
-                macrosY = separatorY + eLY(SEPARATOR) + eLY(6); macrosH = Math.max(0, h - pad - macrosY);
+                macrosY = separatorY + eLY(SEPARATOR) + eLY(6); macrosH = Math.max(0, bottom - macrosY);
                 double right = macrosX + macrosW + eLY(6);
                 panX = right; panW = Math.max(0, pad + headerW - right);
                 stripX = right; stripW = panW;
@@ -1296,7 +1302,7 @@ final class MasterBoWidget extends dve implements drv {
         if (!model.hasMaster()) {
             g.cfM(eLY(PAD), eLY(PAD) + ascent, "No project", text.cfM(0.5F));
         } else {
-            paintLowerBackground(g, ascent);
+            paintLowerBackground(g);
             paintVu(g, font, text, ascent);
             paintSpectrum(g, font, text, ascent);
             paintHeader(g, font, text, ascent);
@@ -1309,6 +1315,7 @@ final class MasterBoWidget extends dve implements drv {
             paintSeparator(g, text);
             paintStrip(g, font, text, ascent);
         }
+        paintFrame(g);
         if (model.hasMaster()) paintPopup(g, kI_().cfM(MrC(), this), e3y().cfM(this)); // over everything
         g.ucQ();                           // restore
     }
@@ -1758,22 +1765,28 @@ final class MasterBoWidget extends dve implements drv {
      * Under the big meters (or the header, without them) to the bottom: (35, 35, 35); behind the pan,
      * the scale, the meters and the fader: (26, 26, 26), from the PAN label down.
      */
-    private void paintLowerBackground(SYo g, double ascent) {
+    private double colourBarH() { return Math.round(eLY(COLOUR_BAR)); }
+
+    /** The master's colour bar at the bottom and the near-black 1 px outline around the whole panel, as a mixer strip. */
+    private void paintFrame(SYo g) {
+        double w = Sxo(), h = yiX(), bar = colourBarH();
+        if (model.hasMaster()) rect(g, EDGE, h - EDGE - bar, w - 2 * EDGE, bar, model.colour);
+        iok outline = theme("Grey 0", iok.cfM(15, 15, 15)); // the theme's darkest grey
+        rect(g, 0, 0, w, EDGE, outline);
+        rect(g, 0, h - EDGE, w, EDGE, outline);
+        rect(g, 0, 0, EDGE, h, outline);
+        rect(g, w - EDGE, 0, EDGE, h, outline);
+    }
+
+    private void paintLowerBackground(SYo g) {
         double top = bigH > 0 ? bigY + bigH + eLY(3) : headerY + eLY(HEADER) + eLY(3);
         rect(g, 0, Math.round(top), Sxo(), yiX() - Math.round(top), themeGrey("Grey 1", 26, "Grey 2", 38, 9 / 12.0)); // 35 in the default theme
         double faderRight = faderX + eLY(FADER_WIDTH);
         if (!(stripGroupX >= panX - 1 && faderRight <= panX + panW + 1)) return; // the strip is not under the pan
-        // the dark box exactly around the strip (from the PAN label to the scale's bottom), no margin,
-        // with a 1 px outline in the theme's darkest grey (near black) just outside it
-        double l = Math.round(Math.min(panX, stripGroupX)), r = Math.round(Math.max(panX + panW, faderRight));
-        double t = Math.round(panY - eLY(4) - ascent - eLY(1));
-        double b = Math.round(Math.max(stripY + stripH, scaleBottom + ascent / 2 + eLY(1)));
-        rect(g, l, t, r - l, b - t, theme("Grey 1", iok.cfM(26, 26, 26)));
-        iok outline = theme("Grey 0", iok.cfM(15, 15, 15));
-        rect(g, l - 1, t - 1, r - l + 2, 1, outline);
-        rect(g, l - 1, b, r - l + 2, 1, outline);
-        rect(g, l - 1, t, 1, b - t, outline);
-        rect(g, r, t, 1, b - t, outline);
+        double m = eLY(4);
+        double l = Math.round(Math.min(panX, stripGroupX) - m), r = Math.round(Math.max(panX + panW, faderRight) + m);
+        double t = Math.round(panY - eLY(16) - m);
+        rect(g, l, t, r - l, yiX() - EDGE - colourBarH() - eLY(2) - t, theme("Grey 1", iok.cfM(26, 26, 26)));
         // cut into three, as Bitwig's mixer: the pan | the readouts | the meters and the fader
         iok cut = themeGrey("Grey 1", 26, "Grey 2", 38, 9 / 12.0);
         double panBottom = panY + eLY(PAN_HEIGHT);
@@ -2273,7 +2286,7 @@ final class MasterBoWidget extends dve implements drv {
         public void cfM(dJH press) {
             if (pressed) return;
             pressed = true;
-            startHeight = yiX() - eLY(PAD) - separatorY - eLY(SEPARATOR); // the fader section, pan included
+            startHeight = yiX() - EDGE - colourBarH() - eLY(BOTTOM_GAP) - separatorY - eLY(SEPARATOR); // the fader section, pan included
         }
 
         @Override
