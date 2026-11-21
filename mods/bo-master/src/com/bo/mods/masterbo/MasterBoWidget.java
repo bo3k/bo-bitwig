@@ -2128,7 +2128,8 @@ final class MasterBoWidget extends dve implements drv {
                 MasterBoModel.Insert insert = inserts.get(index);
                 if (x < insertsX + eLY(7) + eLY(7) + eLY(4)) return new Act(() -> model.toggle(insert)); // the on/off dot
                 if (insert.plugin && x >= insertsX + insertsW - eLY(WINDOW_BUTTON)) return new Act(() -> model.toggleWindow(insert)); // its window
-                return new InsertDrag(index, y); // a click selects the master; a drag moves the insert
+                if (clicks >= 1) return new Act(() -> model.focusInsert(insert)); // a double-click: show it in the device panel
+                return new InsertDrag(index, y); // a click selects it; a drag moves the insert
             }
             // the master's solo and mute
             for (double[] r : soloMuteHits)

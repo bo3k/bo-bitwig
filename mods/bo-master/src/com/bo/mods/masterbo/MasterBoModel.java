@@ -20,6 +20,7 @@ import bitwig.obf.qqr; // a device chain's meter (input_meter / output_meter)
 import bitwig.obf.iCC; // a selection of channels (with its cursor)
 import bitwig.obf.big; // a selection, as the window shows it (active / Inspector)
 import bitwig.obf.akc; // the Inspector panel (its class identifies it in the window)
+import bitwig.obf.ajS; // the device panel (its class identifies it in the window)
 import bitwig.obf.akQ; // a side panel of the window
 import bitwig.obf.AQw; // a panel's visibility
 import bitwig.obf.iok; // a colour
@@ -1596,6 +1597,11 @@ final class MasterBoModel {
      * document action), then makes sure the Inspector panel is open, so it shows the master.
      */
     void selectMaster() {
+        selectMaster(true);
+    }
+
+    /** As selectMaster(); with inspector false the Inspector panel is left as it is. */
+    void selectMaster(boolean inspector) {
         if (master == null) { debug("select: no master"); return; }
         try {
             cuN select = master.TgI(); // TgI(): the channel's "select" action (what select_track runs)
@@ -1618,7 +1624,7 @@ final class MasterBoModel {
         } catch (Throwable failure) {
             debug("selection failed: " + failure);
         }
-        showInspector();
+        if (inspector) showInspector();
         dumpLayout();
     }
 
@@ -1675,6 +1681,27 @@ final class MasterBoModel {
         } catch (Throwable failure) {
             debug("inspector failed: " + failure);
             MasterBoPanels.MOD.log("Master Bo could not open the Inspector", failure);
+        }
+    }
+
+    /**
+     * Shows an insert in Bitwig's device panel, as a double-click on a device in Bitwig's mixer does:
+     * the master track is selected (so the device panel shows its chain), the insert is selected in
+     * that chain, and the device panel is shown if it is hidden.
+     */
+    void focusInsert(Insert insert) {
+        if (master == null || insert == null) return;
+        selectMaster(false);
+        selectInsert(insert);
+        try {
+            Object panel = window.cfM(ajS.class); // cfM(Class): the window's panel of that kind
+            AQw visible = panel instanceof akQ side ? side.cfM(window.RDJ()) : null; // RDJ(): the window's layout settings
+            boolean shown = visible != null && visible.getBoolValue();
+            if (!shown) window.UNj(true); // UNj(true): focus_or_toggle_device_panel
+            debug("focus insert: " + insert.name + (shown ? "" : ", device panel opened"));
+        } catch (Throwable failure) {
+            debug("device panel failed: " + failure);
+            MasterBoPanels.MOD.log("Master Bo could not show the device panel", failure);
         }
     }
 

@@ -31,6 +31,7 @@ It isn't a tab of the lower panels or a view of the Streamlined Views stack. Wit
   - The dot switches a device on (yellow, as on Bitwig's device headers) or off (grey).
   - On a plug-in (of any format), Bitwig's window button (the one on a plug-in's device header) on the right opens or closes the plug-in's window. It is orange while the window is open. Bitwig's own devices have no window, so no button.
   - Click a name to select the insert: it is highlighted, as in Bitwig's device panel, and **Delete** or **Backspace** deletes it (one undo step). A click anywhere else in bo Master ends the selection.
+  - **Double-click** a name to show the insert in Bitwig's device panel (the panel opens if it is hidden).
   - Drag a name up or down to move the insert in the chain.
   - When they don't all fit, the last row says how many more there are.
 - **Latency:** under the last insert, the master's latency in ms, as the device panel shows it.
