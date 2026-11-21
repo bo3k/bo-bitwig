@@ -64,7 +64,7 @@ final class MasterBoWidget extends dve implements drv {
     private static final long COLOUR_BAR = 56;   // the master's colour bar at the bottom, in tenths: 5.6, as Bitwig's mixer (7 px at 125 %)
     private static final long BOTTOM_GAP = 4;    // between the content and the colour bar
     private static final long HEADER = 51; // as tall as Bitwig's own master header in the mixer (64 px at 125 %)
-    private static final long ROW = 20;
+    private static final long ROW = 184; // an insert row (and the latency row), in tenths: 18.4 (23 px at 125 %; Bitwig's mixer slots are 22)
     private static final long PAN_HEIGHT = 18;
     private static final long READOUT = 18;
     // Bitwig's mixer strip (measured from 6.1.4 at 100%): labels, two 7-wide meters a pixel apart, the fader bar
@@ -1106,8 +1106,8 @@ final class MasterBoWidget extends dve implements drv {
             insertsY += macrosH;
             int rowsWide = Math.max(1, model.inserts.size());
             double limitWide = vuLow ? vuY - eLY(8) : specBottomAlone() ? specY - eLY(8) : low ? lufsY - eLY(8) : abovePan;
-            double mostWide = Math.max(0, limitWide - eLY(ROW) - eLY(4) - insertsY);
-            insertsH = Math.min(rowsWide * (double) eLY(ROW), Math.floor(mostWide / eLY(ROW)) * eLY(ROW));
+            double mostWide = Math.max(0, limitWide - row() - eLY(4) - insertsY);
+            insertsH = Math.min(rowsWide * (double) row(), Math.floor(mostWide / row()) * row());
             latencyY = insertsY + insertsH + eLY(2);
             stripX = pad + left + gap * 2; stripY = headerY + eLY(6);
             stripW = Math.max(0, w - stripX - pad); stripH = Math.max(0, bottom - stripY);
@@ -1125,7 +1125,7 @@ final class MasterBoWidget extends dve implements drv {
             // fader and meters. The big meters keep their own height (a share of the panel) until the
             // fader section needs their room: then they get shorter, down to BIG_SHORTEST, while the
             // inserts keep all their rows (pushed up); after that the inserts give up rows.
-            double latencyRow = eLY(ROW);
+            double latencyRow = row();
             double panBlock = eLY(18) + eLY(PAN_HEIGHT) + eLY(12) + msRowH();
             double top = headerY + eLY(HEADER) + eLY(6);
             double under0 = vuLow ? (specTopAlone() ? top + specH : top - eLY(6)) : top + vuH; // under the VU (and the spectrum), without big meters
@@ -1134,8 +1134,8 @@ final class MasterBoWidget extends dve implements drv {
             double tail = latencyRow + eLY(6) + (low ? lufsH + eLY(6) : 0)   // under the inserts: the latency (and the LUFS section)
                     + (vuLow ? vuH + eLY(8) : 0)                                 // (and the VU at the bottom)
                     + (specBottomAlone() ? specH + eLY(8) : 0);                  // (and the spectrum at the bottom)
-            double oneRow = insertsY0 + eLY(ROW) + tail;                        // above the separator with one insert row
-            double allOfThem = insertsY0 + allRows * (double) eLY(ROW) + tail;  // ... with every insert row
+            double oneRow = insertsY0 + row() + tail;                        // above the separator with one insert row
+            double allOfThem = insertsY0 + allRows * (double) row() + tail;  // ... with every insert row
             double bigGap = bigMode > 0 ? eLY(6) : 0;
             double bigDefault = bigMode > 0 ? Math.max(eLY(BIG_MIN), Math.min(eLY(BIG_MAX), h * 0.3)) : 0;
             double bigShortest = bigMode > 0 ? Math.min(bigDefault, eLY(BIG_SHORTEST)) : 0;
@@ -1166,7 +1166,7 @@ final class MasterBoWidget extends dve implements drv {
             int rows = Math.max(1, model.inserts.size());
             double limit = vuLow ? vuY - eLY(4) : specBottomAlone() ? specY - eLY(4) : low ? lufsY - eLY(4) : separatorY;
             double most = Math.max(0, limit - eLY(6) - latencyRow - insertsY);
-            insertsH = Math.min(rows * (double) eLY(ROW), Math.floor(most / eLY(ROW)) * eLY(ROW));
+            insertsH = Math.min(rows * (double) row(), Math.floor(most / row()) * row());
             latencyY = insertsY + insertsH + eLY(2);
         }
         // the strip, as Bitwig's mixer has it: readouts on top, then labels | meter L | meter R | the fader bar
@@ -1445,7 +1445,7 @@ final class MasterBoWidget extends dve implements drv {
     private int dragFrom = -1, dragGap = -1;
 
     private void paintInserts(SYo g, Hpk font, iok text, double ascent) {
-        double row = eLY(ROW);
+        double row = row();
         iok slot = themeGrey("Grey 4", 61, "Grey 5", 73, 8 / 12.0); // (69) each FX slot, as Bitwig's mixer has them (1 px of the background between)
         List<MasterBoModel.Insert> inserts = model.inserts;
         if (inserts.isEmpty()) {
@@ -1702,6 +1702,20 @@ final class MasterBoWidget extends dve implements drv {
     }
 
     /** S (solo: yellow when on) and M (mute: orange when on); off, grey with a light letter. */
+    /**
+     * The solo button on, as Bitwig's mixer draws it: its yellow darkening slightly to the bottom
+     * (214, 204, 0 to 198, 188, 0), a light line on top and a darker one at the bottom.
+     */
+    private void soloFace(SYo g, double x, double y, double w, double h, iok top) {
+        double x0 = Math.round(x), y0 = Math.round(y), ww = Math.round(x + w) - x0, hh = Math.round(y + h) - y0;
+        for (int i = 0; i < hh; i++) {
+            double t = hh > 1 ? i / (hh - 1.0) : 0;
+            iok c = i == 0 ? iok.cfM(196, 191, 73) : i == hh - 1 ? iok.cfM(126, 121, 13)
+                    : iok.cfM((int) Math.round(214 - 16 * t), (int) Math.round(204 - 16 * t), 0);
+            rect(g, x0, y0 + i, ww, 1, c);
+        }
+    }
+
     private void paintSoloMute(SYo g, Hpk font, iok text) {
         soloMuteHits.clear();
         if (!model.soloMuteFound) return;
@@ -1714,15 +1728,16 @@ final class MasterBoWidget extends dve implements drv {
         Hpk small = boldFont(font); // the letters bold, in the panel's size
         double sa = small.cfM().cfM();
         g.cfM(small);
-        iok yellow = theme("Solo", iok.cfM(232, 203, 70));
+        iok yellow = iok.cfM(214, 204, 0); // the solo button's yellow in Bitwig's mixer (not the theme's Solo colour, which is paler)
         iok orange = theme("Accent (default)", ACCENT);
         for (int k = 0; k < 2; k++) {
             boolean on = k == 0 ? model.soloOn : model.muteOn;
             double x = left + k * (bw + gap);
-            rect(g, x, top, bw, bh, on ? (k == 0 ? yellow : orange) : themeGrey("Grey 4", 61, "Grey 5", 73, 8 / 12.0)); // off: the FX slots' grey
+            if (on && k == 0) soloFace(g, x, top, bw, bh, yellow);
+            else rect(g, x, top, bw, bh, on ? orange : themeGrey("Grey 4", 61, "Grey 5", 73, 8 / 12.0)); // off: the FX slots' grey
             String letter = k == 0 ? "S" : "M";
             double lw = small.cfM(letter).IwV();
-            iok ink = on ? iok.cfM(20, 20, 20) : text.cfM(0.85F);
+            iok ink = on ? (k == 0 ? iok.cfM(0, 0, 0) : iok.cfM(20, 20, 20)) : text.cfM(0.85F);
             double lx = x + (bw - lw) / 2, ly = top + (bh + sa) / 2 - 1;
             text(g, small, lx, ly, letter, ink);
             text(g, small, lx + 0.6, ly, letter, ink); // drawn twice, a hair apart: bolder than the bold face alone
@@ -1749,7 +1764,7 @@ final class MasterBoWidget extends dve implements drv {
 
     /** The latency row under the inserts: the master's latency (value only, right-aligned), as the device panel shows it. */
     private void paintLatency(SYo g, Hpk font, iok text, double ascent) {
-        double row = eLY(ROW);
+        double row = row();
         if (latencyY < insertsY) return;
         double base = latencyY + (row + ascent) / 2 - 1;
         // "+": insert a device after the last one (Bitwig's pop-up browser), as the mixer's device slots
@@ -1765,6 +1780,8 @@ final class MasterBoWidget extends dve implements drv {
      * Under the big meters (or the header, without them) to the bottom: (35, 35, 35); behind the pan,
      * the scale, the meters and the fader: (26, 26, 26), from the PAN label down.
      */
+    private double row() { return Math.round(eLY(ROW) / 10.0); }
+
     private double colourBarH() { return Math.round(eLY(COLOUR_BAR) / 10.0); }
 
     /** The master's colour bar at the bottom and the near-black 1 px outline around the whole panel, as a mixer strip. */
@@ -2139,10 +2156,10 @@ final class MasterBoWidget extends dve implements drv {
             if (in(x, y, headerX, headerY, headerW, eLY(HEADER))) return new Act(model::selectMaster);
             if (bigH > 0 && in(x, y, bigX, bigY, bigW, bigH)) return new Act(model::resetPeaks); // the big meters: reset the peaks
             // "+" in the row under the inserts: the pop-up browser, to insert a device at the end of the chain
-            if (latencyY >= insertsY && in(x, y, insertsX, latencyY, eLY(22), eLY(ROW))) return new Act(this::openInsertBrowser);
+            if (latencyY >= insertsY && in(x, y, insertsX, latencyY, eLY(22), row())) return new Act(this::openInsertBrowser);
             // inserts
             if (in(x, y, insertsX, insertsY, insertsW, insertsH)) {
-                int index = (int) Math.floor((y - insertsY) / eLY(ROW));
+                int index = (int) Math.floor((y - insertsY) / row());
                 List<MasterBoModel.Insert> inserts = model.inserts;
                 if (index < 0 || index >= inserts.size()) return new Act(model::selectMaster);
                 MasterBoModel.Insert insert = inserts.get(index);
@@ -2229,7 +2246,7 @@ final class MasterBoWidget extends dve implements drv {
             if (!dragging && Math.abs(y - pressY) < eLY(4)) return;
             dragging = true;
             int count = model.inserts.size();
-            int gap = (int) Math.round((y - insertsY) / eLY(ROW));
+            int gap = (int) Math.round((y - insertsY) / row());
             dragFrom = from;
             dragGap = Math.max(0, Math.min(count, gap));
             jbi();
