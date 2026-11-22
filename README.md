@@ -23,7 +23,7 @@ The master track's strip pinned on the right side, solo or next to Bitwig's Brow
 Master is always visible, also in Edit or Arranger view. It supports the Insert FX handling, Track Remotes and display of the dedicated bo Bitwig devices for metering.
 The devices have to be download and installed from the links below.
 
-**Download:** [bo-master.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master.zip) and [panels-framework.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/panels-framework.zip) (needed). Its meters come from the devices [bo LUFS](devices/bo-lufs), [bo Spectrum](devices/bo-spectrum) and [bo Scope](devices/bo-scope).
+**Download:** [bo-master.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master.zip). It needs Framework: Panels 0.3.0-dev.6 or later, which comes with Patchbay (see Install). Its meters come from the devices [bo LUFS](devices/bo-lufs), [bo Spectrum](devices/bo-spectrum) and [bo Scope](devices/bo-scope).
 
 ### [Save Incrementally](mods/save-incrementally)
 
@@ -45,19 +45,23 @@ A shortcut for every Bitwig effect and instrument. You choose the keys.
 
 ![bo Scope, bo Spectrum, bo LUFS and bo Safety](devices/media/master-fx-devices.png)
 
-| Device | What it does | Download |
-|---|---|---|
-| [bo Curve](devices/bo-curve) | 1st modding test, a custom saturator with three characteristics. It also has three skins | [bo-Curve.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Curve.bwdevice) |
-| [bo Safety](devices/bo-safety) | Safety limiter for the master. Protects speakers and ears from sudden loud peaks | [bo-Safety.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Safety.bwdevice) |
-| [bo LUFS](devices/bo-lufs) | Loudness meter: momentary, short-term, integrated, true peak. Required for bo Master | [bo-LUFS.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-LUFS.bwdevice) |
-| [bo Spectrum](devices/bo-spectrum) | 31-band spectrum. Required for bo Master | [bo-Spectrum.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Spectrum.bwdevice) |
-| [bo Scope](devices/bo-scope) | Goniometer and correlation meter. Required for bo Master | [bo-Scope.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Scope.bwdevice) |
+| Device | Type | What it does | Download |
+|---|---|---|---|
+| [bo Curve](devices/bo-curve) | Audio FX | 1st modding test, a custom saturator with three characteristics. It also has three skins | [bo-Curve.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Curve.bwdevice) |
+| [bo Safety](devices/bo-safety) | Audio FX | Safety limiter for the master. Protects speakers and ears from sudden loud peaks | [bo-Safety.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Safety.bwdevice) |
+| [bo LUFS](devices/bo-lufs) | Audio FX | Loudness meter: momentary, short-term, integrated, true peak. Required for bo Master | [bo-LUFS.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-LUFS.bwdevice) |
+| [bo Spectrum](devices/bo-spectrum) | Audio FX | 31-band spectrum. Required for bo Master | [bo-Spectrum.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Spectrum.bwdevice) |
+| [bo Scope](devices/bo-scope) | Audio FX | Goniometer and correlation meter. Required for bo Master | [bo-Scope.bwdevice](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-Scope.bwdevice) |
 
 **All five in one:** [bo-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-devices.zip) · ** Three bo Master meter devices** (LUFS, Spectrum, Scope): [bo-master-devices.zip](https://github.com/bo3k/bo-bitwig/releases/latest/download/bo-master-devices.zip)
 
 ## Install
 
-1. **Patchbay (BML)** 0.36.0-dev.13 or later.
+**With [Patchbay Launcher](https://github.com/arius77R/patchbay-launcher):** in Sources → Mods → **+ Add**, type `bo3k/bo-bitwig` and click **Check**. The mods then show in its Mods tab, the devices in its Devices tab.
+
+**By hand:**
+
+1. **Patchbay (BML)** 0.36.0-dev.17 or later, with **Framework: Panels 0.3.0-dev.6** or later for bo Master. Until a Patchbay release includes that version, take `panel-management-framework-0.3.0-dev.6.zip` from [Patchbay's 0.36.0-dev.17 release](https://github.com/shaboogen-dev/Patchbay/releases) and add it with **Add Mod…**; it replaces the Panels already there.
 2. **Mods:** on Patchbay's Mods page, click **Add Mod…** (or drop the zips on its window), then tick the mods.
 3. **Devices:** put the `.bwdevice` files in a folder and add that folder under **Tools > Device Folders** in Patchbay.
 
@@ -65,4 +69,4 @@ All downloads are also on the [Releases](https://github.com/bo3k/bo-bitwig/relea
 
 ---
 
-Building from source: [BUILDING.md](BUILDING.md). The Panels framework is by shaboogen, under the MIT licence.
+Building from source: [BUILDING.md](BUILDING.md).

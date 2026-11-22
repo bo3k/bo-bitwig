@@ -19,11 +19,16 @@ Built with `tools/mod-build`:
 - `Finish` rewrites the stub package and lists the `opens` a mod needs.
 - `build-mod.sh <mod folder> [framework …]` assembles the installable mod folder and a Patchbay zip (one top folder named after the mod's ID, as Add Mod… requires).
 
-bo Master compiles against the Panels framework's `helper.jar` (`build-mod.sh mods/bo-master panel-management-framework`); the two workflow mods against Framework: Actions and Menus. Mods are built against Bitwig 6.1.4; BML translates them to 6.1.7 itself.
+bo Master compiles against Framework: Panels 0.3.0-dev.6 (`build-mod.sh mods/bo-master panel-management-framework`, with that version's `helper.jar` from Patchbay); the other two mods against Framework: Actions and Menus. Mods are built against Bitwig 6.1.4; Patchbay translates them to the other versions itself.
 
-### Why bo Master needs its own Panels build
+### For Patchbay Launcher
 
-bo Master's view is declared with `side("browser")`, `sideFirst(true)` and `sideColumn(...)`. Those calls exist only in this build of shaboogen's framework (`0.2.0-dev.2.bo.5`); the original `0.2.0-dev.2` that ships with BML can only place views in the main area and its stacks. What the build adds is in [`mods/panels-framework/CHANGES.md`](mods/panels-framework/CHANGES.md). The framework is MIT-licensed; its licence is kept in that folder and in its zip.
+[Patchbay Launcher](https://github.com/arius77R/patchbay-launcher) finds the mods in this repo's releases ([its rules](https://github.com/arius77R/patchbay-launcher/blob/main/docs/PUBLISHING.md)):
+
+- Each mod is one release file `<mod-id>-<version>.zip`, as `build-mod.sh` writes it (`master-bo-0.2.0-dev.1.zip`). A changed mod gets a new version; a released file is never replaced.
+- The finished `mod.json` of each mod, copied from the build output, is at `<mod-id>/mod.json` at the top of the repo (`master-bo/`, `save-incrementally/`, `insert-device-via-shortcut/`). The source stays in `mods/`.
+- Each mod's name starts with one of the Launcher's categories (`Interface: bo Master`, `Project: Save Incrementally`, `Commands: Insert Device via Shortcut`), and its frameworks are in `requires`.
+- The devices are found as the `.bwdevice` files in the repo. The Launcher takes each one's type and description from the device table in the top README (`| [name](…) | Type | What it does |`), and its picture from `previews/<name>.png`.
 
 ## Devices
 
@@ -48,14 +53,15 @@ No Bitwig button style draws nothing, and a hidden button takes no clicks (`tool
 
 ## Releases
 
-One release holds everything, with the same file names every time, so the download links in the READMEs (`releases/latest/download/<file>`) always point at the newest files:
+Each release holds everything, in two forms:
 
-`bo-master.zip`, `panels-framework.zip`, `save-incrementally.zip`, `insert-device-via-shortcut.zip`, `bo-Curve.bwdevice`, `bo-Safety.bwdevice`, `bo-LUFS.bwdevice`, `bo-Spectrum.bwdevice`, `bo-Scope.bwdevice`, `bo-devices.zip` (all five, with their real names) and `bo-master-devices.zip` (bo LUFS, bo Spectrum and bo Scope).
+- **For Patchbay Launcher:** each mod as `<mod-id>-<version>.zip` (above).
+- **For the download links in the READMEs** (`releases/latest/download/<file>`), the same files under names that never change: `bo-master.zip`, `save-incrementally.zip`, `insert-device-via-shortcut.zip`, `bo-Curve.bwdevice`, `bo-Safety.bwdevice`, `bo-LUFS.bwdevice`, `bo-Spectrum.bwdevice`, `bo-Scope.bwdevice`, `bo-devices.zip` (all five, with their real names) and `bo-master-devices.zip` (bo LUFS, bo Spectrum and bo Scope).
 
-A release must not be marked as a pre-release, or `latest` skips it. The mods' versions are inside the mods (Patchbay shows them), not in the file names.
+A release must not be marked as a pre-release, or `latest` skips it.
 
 ## Not in this repo
 
 - Bitwig's files: `bitwig.jar`, stubs or classes made from it, and Bitwig's own resources.
-- BML and its frameworks, apart from the Panels build bo Master needs, and other people's mods.
+- Patchbay (BML), its frameworks and other people's mods.
 - bo Magnetic.

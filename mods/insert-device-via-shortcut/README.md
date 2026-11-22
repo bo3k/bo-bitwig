@@ -1,4 +1,4 @@
-# Insert Device via Shortcut
+# Commands: Insert Device via Shortcut
 
 Actions that insert a device on the current track (the one whose devices the device panel shows):
 

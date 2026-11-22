@@ -2,11 +2,12 @@
   "manifest_version": 2,
   "mod": {
     "id": "save-incrementally",
-    "name": "Save Incrementally",
-    "area": "Workflow",
-    "version": "0.1.0-dev.2",
+    "name": "Project: Save Incrementally",
+    "area": "Project",
+    "version": "0.1.0-dev.3",
     "author": "Bo",
     "description": "Save Incrementally in the File menu, after Save as: saves the project with the number at the end of its name plus one, or _001 appended.",
+    "homepage": "https://github.com/bo3k/bo-bitwig/tree/main/mods/save-incrementally",
     "documentation": "readme"
   },
   "built_against": {

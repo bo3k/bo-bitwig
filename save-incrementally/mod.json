@@ -1,0 +1,79 @@
+{
+  "manifest_version": 2,
+  "mod": {
+    "id": "save-incrementally",
+    "name": "Project: Save Incrementally",
+    "area": "Project",
+    "version": "0.1.0-dev.3",
+    "author": "Bo",
+    "description": "Save Incrementally in the File menu, after Save as: saves the project with the number at the end of its name plus one, or _001 appended.",
+    "homepage": "https://github.com/bo3k/bo-bitwig/tree/main/mods/save-incrementally",
+    "documentation": "readme"
+  },
+  "built_against": {
+    "bitwig_version": "6.1.4",
+    "platform": "windows",
+    "architecture": "x64"
+  },
+  "targets": {
+    "aCp.H_": {
+      "kind": "method",
+      "owner": "aCp",
+      "name": "H_",
+      "descriptor": "()V"
+    },
+    "dsp.MRY.section": {
+      "kind": "method",
+      "owner": "dsp",
+      "name": "MRY",
+      "descriptor": "(Ljava/lang/String;Ldsg;[LdmX;)Ldsm;"
+    }
+  },
+  "hooks": [
+    {
+      "id": "file-menu-save-incrementally",
+      "target": "aCp.H_",
+      "transform": "REPLACE_INVOKE",
+      "match": {
+        "opcode": "INVOKEVIRTUAL",
+        "target": "dsp.MRY.section",
+        "occurrence": 1
+      },
+      "bridge": {
+        "method": "projectSection",
+        "descriptor": "(Ldsp;Ljava/lang/String;Ldsg;[LdmX;)Ldsm;",
+        "args": []
+      }
+    }
+  ],
+  "helper": {
+    "jar": "helper.jar",
+    "class": "com.bo.mods.saveincrementally.SaveIncrementallyHooks"
+  },
+  "requires": [
+    {
+      "id": "action-menu-composition-framework",
+      "min_version": "0.7.0-dev.1"
+    }
+  ],
+  "resources": {
+    "readme": {
+      "kind": "file",
+      "path": "README.md",
+      "media_type": "text/markdown"
+    },
+    "save_incrementally_icon": {
+      "kind": "file",
+      "path": "resources/save-incrementally/save-incrementally.svg",
+      "media_type": "image/svg+xml"
+    }
+  },
+  "registrations": [
+    {
+      "id": "actions",
+      "consumer": "action-menu-composition-framework",
+      "descriptor": "actions.properties",
+      "jar": "helper.jar"
+    }
+  ]
+}

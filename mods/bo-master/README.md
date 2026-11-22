@@ -1,8 +1,8 @@
-# Panel: bo Master
+# Interface: bo Master
 
 https://github.com/user-attachments/assets/1be3e125-fb3e-419e-9922-86086e3542f7
 
-For Bitwig 6.1.4 (Windows x64). Needs **Framework: Panels** 0.2.0-dev.2.bo.2 or later, Bo's build with views on the browser side (and the framework's own prerequisites, Framework: Settings and Framework: Actions and Menus).
+Built against Bitwig 6.1.4 (Windows x64). Needs **Framework: Panels** 0.3.0-dev.6 or later, which comes with Patchbay (it brings Framework: Settings and Framework: Actions and Menus with it). Its meters come from the devices **bo LUFS**, **bo Spectrum** and **bo Scope**.
 
 A panel with the master track's strip: a VU meter, fader, pan, peak and RMS meters with peak hold, and the master's inserts with their windows.
 
@@ -12,14 +12,13 @@ Its greys come from Bitwig's theme, so a custom theme changes them as it changes
 
 ## Where it appears
 
-bo Master is a tab of the **browser side**, the right-hand panel with the Browser, Project, Studio I/O and Mappings tabs. Its tab comes first, and its button sits first in that group of the bottom bar, before the Browser's. The side still opens on the Browser by default:
+bo Master is a full-height **column of its own** between the main area and the **browser side** (the Browser, Project, Studio I/O and Mappings panels). It is shown by default; its width and whether it is shown are saved with the project.
 
-- **Click** it to show bo Master on the browser side; click it again while it is shown to close the side, as Bitwig's own buttons there do.
-- **Right-click** it for its scale (75% to 200%), also in **Settings > User Interface > Panel Scale**.
-- **Show bo Master** is an action in Bitwig's **Panel Management** category (Settings > Shortcuts, the Commander).
-- The side's width is Bitwig's own: drag its edge. In the side's narrow column the strip stacks: VU, header, inserts with the latency under the last one, then a separator and the fader section under it: pan, readouts, fader and meters. Drag the separator up or down to size the fader section (for example to start it level with the device panel's top); the height is kept in bo Master's settings, and a double-click on the separator goes back to the default. Made wider than it is tall, the VU, inserts and pan move to the left of the fader and meters.
-
-It isn't a tab of the lower panels or a view of the Streamlined Views stack. With Panel: Separate Browser Panels (the browser side as columns) it isn't shown.
+- **Its button** sits with the browser side's buttons in the bottom bar, set apart from them by a divider. A click shows it alone, **Cmd/Ctrl-click** adds or removes it, and **right-click** gives its scale (75% to 200%, also in **Settings > User Interface > Panel Scale**).
+- **Show bo Master** and **Add or Remove bo Master in the Split** are actions (Settings > Shortcuts, the Commander).
+- Drag the divider beside it for its width. In a narrow column the strip stacks: VU, header, inserts with the latency under the last one, then a separator and the fader section under it: pan, readouts, fader and meters. Drag the separator up or down to size the fader section (for example to start it level with the device panel's top); the height is kept in bo Master's settings, and a double-click on the separator goes back to the default. Made wider than it is tall, the VU, inserts and pan move to the left of the fader and meters.
+- With **Panel: Choose Sides** putting the browser on the left, bo Master moves with it. With **Panel: Separate Browser Panels**, it is one more column after Bitwig's.
+- A project saved with bo Master shown still opens in Bitwig without mods.
 
 ## The strip
 
@@ -74,10 +73,3 @@ The three bars at the right end of the MASTER header are Bitwig's **Show Big Met
 
 The MASTER header stays on top either way. The big meters have their own height (about a third of the panel, at most 320 at 100%). When the separator is dragged up so far that the fader section needs their room, they get shorter (down to 60) and the inserts, the VU and the rest above keep their size and move up with it; only then do the inserts give up rows. They show the peak lighter, the RMS solid and the peak hold as a line, on Bitwig's big-meter scale: +6 dB at the top, 0 to -30 dB in even steps, then -36, -42, -48, -60 and -inf, with marks beside the digits and right of the meters. While they are shown, the fader section has the fader and its scale only (no meters and no peak readout). The state is kept. A click on the big meters resets the peaks.
 
-## Placement
-
-bo Master is a column of its own, to the left of the browser side (between it and the arranger), with its own width (drag its divider; saved with the project). The Browser, Project, Studio I/O and Mappings panels keep their own place, width and buttons; open one and it appears to the right of bo Master.
-
-Its button, a master fader, sits at the right end of the bottom bar, just before the keyboard's: a click shows or hides bo Master. It is shown by default.
-
-Needs Framework: Panels 0.2.0-dev.2.bo.5 (Bo's build).

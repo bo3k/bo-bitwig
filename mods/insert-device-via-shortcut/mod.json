@@ -2,11 +2,12 @@
   "manifest_version": 2,
   "mod": {
     "id": "insert-device-via-shortcut",
-    "name": "Insert Device via Shortcut",
-    "area": "Workflow",
-    "version": "0.1.0-dev.2",
+    "name": "Commands: Insert Device via Shortcut",
+    "area": "Commands",
+    "version": "0.1.0-dev.3",
     "author": "Bo",
     "description": "Shortcuts, with no keys of their own, that insert Tool, Chain, Pro-Q 4 (VST3 or CLAP) and every Bitwig audio effect and instrument on the current track. Assign the keys in Settings > Shortcuts.",
+    "homepage": "https://github.com/bo3k/bo-bitwig/tree/main/mods/insert-device-via-shortcut",
     "documentation": "readme"
   },
   "built_against": {
