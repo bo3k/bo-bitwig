@@ -151,12 +151,39 @@ final class MasterBoWidget extends dve implements drv {
             else specOwnH = Math.max(eLY(56), Math.min(Math.min(width * 0.5, eLY(VU_MAX_HEIGHT)), h * 0.2))
                     + eLY(SPEC_FREQ_ROW) + eLY(SPEC_STRIP);
         }
+        sonoPartH = 0;
+        if (model.spectrumFound) { // the spectrogram: as tall as the spectrum's graph, with its frequencies and its strip
+            if (sonoCollapsed) sonoPartH = eLY(VU_BAR);
+            else sonoPartH = Math.max(eLY(56), Math.min(Math.min(width * 0.5, eLY(VU_MAX_HEIGHT)), h * 0.2))
+                    + eLY(SPEC_FREQ_ROW) + eLY(SPEC_STRIP);
+        }
+        model.sonoOn = sonoPartH > 0 && !sonoCollapsed;
         if (model.scopeFound) gonioH = gonioCollapsed ? eLY(VU_BAR) : Math.max(eLY(80), Math.min(width * 0.75, eLY(170))) + eLY(SPEC_STRIP);
-        specH = specOwnH + gonioH + (specOwnH > 0 && gonioH > 0 ? eLY(6) : 0);
+        int parts = (specOwnH > 0 ? 1 : 0) + (sonoPartH > 0 ? 1 : 0) + (gonioH > 0 ? 1 : 0);
+        specH = specOwnH + sonoPartH + gonioH + Math.max(0, parts - 1) * eLY(6);
         return specH > 0 ? eLY(6) + specH : 0;
     }
 
-    private double specOwnH, gonioH;
+    private double specOwnH, gonioH, sonoPartH;
+
+    /** The spectrogram's top: under the spectrum (with the gap), above the goniometer. */
+    private double sonoY() {
+        return specY + (specOwnH > 0 ? specOwnH + eLY(6) : 0);
+    }
+
+    // the spectrogram folds the same way, kept apart
+    private static final String SONO_COLLAPSED_KEY = "sono_collapsed";
+    private static boolean sonoCollapsed = readBool(SONO_COLLAPSED_KEY);
+
+    private void setSonoCollapsed(boolean collapsed) {
+        sonoCollapsed = collapsed;
+        try {
+            MasterBoPanels.MOD.settings().putBoolean(SONO_COLLAPSED_KEY, collapsed);
+        } catch (Throwable failure) {
+            MasterBoPanels.MOD.log("Master Bo could not keep the spectrogram folded", failure);
+        }
+        jbi();
+    }
 
     private static final long SPEC_STRIP = 16;
     private static final long SPEC_FREQ_ROW = 11;   // the frequencies' row under the graph
@@ -267,6 +294,195 @@ final class MasterBoWidget extends dve implements drv {
      * Plot: the curve, its points placed by frequency on the bars' scale (band of f, centred in its
      * column), a line 1.5 px; filled: the area under it in the colour at 25 %.
      */
+    // ---------- The spectrogram: BO Spectrum's stereo spectrum over time, newest row at the top ----------
+    // Two off-screen images of Bitwig's own: a new row draws the other one as the last one moved down,
+    // with the row on top, so a row costs one image and one line of rectangles. Rows come at the
+    // chosen speed (rows a second); between rows each point keeps its highest value, so short sounds
+    // still show at slow speeds.
+    private double[] sonoMoveHit;
+    private final java.util.List<double[]> sonoHits = new java.util.ArrayList<>(); // x, y, w, h, 0 slope / 1 speed / 2 gradient
+    private com.bitwig.graphics.qc1 sonoA, sonoB; // sonoA: the one shown
+    private int sonoW, sonoH;
+    private iok sonoFace;
+    private long sonoSeen = -1, sonoLastNanos;
+    private double sonoDue;                         // rows owed (fractional)
+    private final double[] sonoPeak = new double[MasterBoModel.CURVE_N];
+    private boolean sonoFailed;
+    private iok[] sonoRamp;
+    private int sonoRampOf = -1;
+    private static final int SONO_STEPS = 64;
+    private static final iok BLACK = iok.cfM(0, 0, 0);
+
+    /** The gradient (0 Default, 1 B/W, 2 Magma), from the face at the bottom of the range, in SONO_STEPS steps. */
+    private iok sonoRampFace;
+
+    private iok[] sonoRamp(int gradient, iok face) {
+        if (sonoRamp != null && sonoRampOf == gradient && face.equals(sonoRampFace)) return sonoRamp;
+        sonoRampFace = face;
+        final iok BLACK = face; // the quietest: the section's face (as the spectrum's and the VU's)
+        double[] at;
+        iok[] stop;
+        switch (gradient) {
+            case 1 -> { at = new double[] {0, 1}; stop = new iok[] {BLACK, iok.cfM(255, 255, 255)}; }  // B/W
+            case 2 -> { at = new double[] {0, 0.13, 0.25, 0.38, 0.5, 0.63, 0.75, 0.88, 1};            // Magma (as matplotlib's)
+                        stop = new iok[] {BLACK, iok.cfM(28, 16, 68), iok.cfM(79, 18, 123), iok.cfM(129, 37, 129), iok.cfM(181, 54, 122),
+                                          iok.cfM(229, 80, 100), iok.cfM(251, 135, 97), iok.cfM(254, 194, 135), iok.cfM(252, 253, 191)}; }
+            default -> { iok accent = theme("Accent (default)", ACCENT);                                // Default: Bitwig's accent, up to white
+                         at = new double[] {0, 0.35, 0.7, 0.88, 1};
+                         stop = new iok[] {BLACK, BLACK.cfM(accent, 0.35F), accent, accent.cfM(iok.cfM(255, 255, 255), 0.5F), iok.cfM(255, 255, 255)}; }
+        }
+        iok[] out = new iok[SONO_STEPS];
+        for (int i = 0; i < SONO_STEPS; i++) {
+            double t = i / (double) (SONO_STEPS - 1);
+            int k = 1;
+            while (k < at.length - 1 && at[k] < t) k++;
+            out[i] = stop[k - 1].cfM(stop[k], (float) ((t - at[k - 1]) / (at[k] - at[k - 1]))); // cfM(iok, t): mixed
+        }
+        sonoRampOf = gradient;
+        return sonoRamp = out;
+    }
+
+    /** The spectrogram's background: the grey of the VU's and the spectrum's strips. */
+    private iok sonoBackground() {
+        return theme("Grey 2", iok.cfM(38, 38, 38));
+    }
+
+    private void freeSono() {
+        try { if (sonoA != null) sonoA.iy_(); } catch (Throwable ignored) { }
+        try { if (sonoB != null) sonoB.iy_(); } catch (Throwable ignored) { }
+        sonoA = sonoB = null;
+    }
+
+    private void paintSpectrogram(SYo g, Hpk font, iok text, double ascent, double y) {
+        double partH = sonoPartH;
+        iok orange = theme("Accent (default)", ACCENT);
+        if (sonoCollapsed) { // folded: a bar, as the spectrum's and the goniometer's
+            rect(g, specX, y, specW, partH, text.cfM(0.06F));
+            g.cfM(specX + eLY(8), y + (partH + ascent) / 2 - 1, "Spectrogram", text.cfM(0.7F));
+            double sw = eLY(VU_MOVE), ix = specX + specW - sw - eLY(2);
+            triangle(g, ix + sw / 2, y + partH / 2, specLow, orange);
+            sonoMoveHit = new double[] {ix, y, sw, partH};
+            return;
+        }
+        Hpk small = smallFont(font);
+        double sa = small.cfM().cfM();
+        Hpk tiny = tinyFont(font);
+        double ta = tiny.cfM().cfM();
+        double strip = eLY(SPEC_STRIP), freqRow = eLY(SPEC_FREQ_ROW);
+        rect(g, specX, y, specW, partH, sonoBackground()); // the darker grey of the strips under the VU and the spectrum
+        // the picture: 20 Hz at the left to 20 kHz at the right (log), time downwards
+        double gx = Math.round(specX + eLY(3)), gy = Math.round(y + eLY(4));
+        double gw = Math.round(specX + specW - eLY(3)) - gx, gh = Math.round(partH - strip - freqRow - eLY(4));
+        paintSonoPicture(g, gx, gy, gw, gh);
+        // the frequencies under it
+        g.cfM(tiny);
+        double lastRight = -1e9;
+        for (int i = 0; i < SPEC_OCTAVES.length; i++) {
+            double x = Math.round(gx + gw * Math.log(SPEC_OCTAVES[i] / 20) / Math.log(1000));
+            String label = SPEC_OCTAVE_LABELS[i];
+            double lw = tiny.cfM(label).IwV();
+            double lx = Math.max(gx, Math.min(gx + gw - lw, x - lw / 2));
+            if (lx < lastRight + eLY(3)) continue;
+            g.cfM(lx, gy + gh + eLY(2) + ta, label, text.cfM(0.8F));
+            lastRight = lx + lw;
+        }
+        // the strip: Slope, Speed and the gradient (a click: the next of each), the move switch
+        double sTop = y + partH - strip;
+        rect(g, specX + 1, sTop, specW - 2, strip - 1, theme("Grey 2", iok.cfM(38, 38, 38)));
+        g.cfM(small);
+        double base = sTop + (strip + sa) / 2 - 1;
+        double switchW = eLY(VU_MOVE), limit = specX + specW - eLY(4) - switchW;
+        double tx = specX + eLY(5);
+        String[][] items = {{"Slope", MasterBoModel.SLOPE_LABELS[model.sonoSlope]},
+                            {"Speed", MasterBoModel.SONO_SPEED_LABELS[model.sonoSpeed]},
+                            {null, MasterBoModel.SONO_GRADIENTS[model.sonoGradient]}};
+        for (int k = 0; k < items.length; k++) {
+            double need = (items[k][0] == null ? 0 : small.cfM(items[k][0]).IwV() + eLY(6)) + small.cfM(items[k][1]).IwV();
+            if (tx + need > limit) break;
+            double start = tx;
+            if (items[k][0] != null) tx = text(g, small, tx, base, items[k][0], text.cfM(0.7F)) + eLY(6);
+            tx = text(g, small, tx, base, items[k][1], orange);
+            sonoHits.add(new double[] {start - eLY(4), sTop, tx - start + eLY(8), strip, k});
+            tx += eLY(12);
+        }
+        double ix = specX + specW - switchW - eLY(2);
+        triangle(g, ix + switchW / 2, sTop + strip / 2, specLow, orange);
+        sonoMoveHit = new double[] {ix, sTop, switchW, strip};
+        g.cfM(font);
+    }
+
+    private void paintSonoPicture(SYo g, double x, double y, double w, double h) {
+        if (sonoFailed) {
+            g.cfM(x + eLY(4), y + eLY(14), "Spectrogram unavailable", iok.cfM(200, 200, 200));
+            return;
+        }
+        int iw = (int) Math.round(w), ih = (int) Math.round(h);
+        if (iw < 2 || ih < 2) return;
+        try {
+            iok face = sonoBackground();
+            iok[] ramp = sonoRamp(model.sonoGradient, face);
+            if (sonoA == null || iw != sonoW || ih != sonoH || !face.equals(sonoFace)) { // new size (or face): two images, cleared to the face
+                freeSono();
+                com.bitwig.graphics.sal system = kI_().hUR(); // the window's graphics system
+                sonoA = system.cfM(iw, ih, com.bitwig.graphics.Jkg.cfM);
+                sonoB = system.cfM(iw, ih, com.bitwig.graphics.Jkg.cfM);
+                for (com.bitwig.graphics.qc1 image : new com.bitwig.graphics.qc1[] {sonoA, sonoB}) {
+                    SYo s = image.cfM();
+                    rect(s, 0, 0, iw, ih, face);
+                    s.iy_();
+                }
+                sonoW = iw;
+                sonoH = ih;
+                sonoFace = face;
+                sonoSeen = -1;
+                sonoDue = 0;
+                java.util.Arrays.fill(sonoPeak, -200);
+            }
+            long now = System.nanoTime();
+            double dt = sonoLastNanos == 0 ? 0 : Math.min(0.25, (now - sonoLastNanos) / 1e9);
+            sonoLastNanos = now;
+            if (model.sonoFrame != sonoSeen) { // fresh values: each point keeps its highest until the next row
+                sonoSeen = model.sonoFrame;
+                for (int p = 0; p < sonoPeak.length; p++) sonoPeak[p] = Math.max(sonoPeak[p], model.sonoCurve[p]);
+            }
+            if (model.engineOn) sonoDue += dt * MasterBoModel.SONO_SPEEDS[model.sonoSpeed]; // no audio engine: it stands still
+            else sonoDue = 0;
+            int rows = (int) Math.min(Math.floor(sonoDue), 16);
+            if (rows > 0) { // into the other image: the last one moved down, the new rows on top
+                sonoDue -= Math.floor(sonoDue);
+                int n = sonoPeak.length;
+                SYo s = sonoB.cfM();
+                sonoA.MRY(s, 0, rows);
+                int runStart = 0, runStep = -1;
+                for (int px = 0; px <= iw; px++) {
+                    int step = -2;
+                    if (px < iw) {
+                        double p = px / (double) (iw - 1) * (n - 1); // the picture is log in frequency, as the curve's points
+                        int i0 = (int) Math.floor(p), i1 = Math.min(n - 1, i0 + 1);
+                        double v = sonoPeak[i0] + (p - i0) * (sonoPeak[i1] - sonoPeak[i0]);
+                        double f = (v - (SPEC_TOP_DB - SPEC_RANGE_DB)) / SPEC_RANGE_DB;
+                        step = (int) Math.round(Math.max(0, Math.min(1, f)) * (SONO_STEPS - 1));
+                    }
+                    if (step != runStep) {
+                        if (runStep >= 0 && px > runStart) rect(s, runStart, 0, px - runStart, rows, ramp[runStep]);
+                        runStart = px;
+                        runStep = step;
+                    }
+                }
+                s.iy_();
+                com.bitwig.graphics.qc1 swap = sonoA;
+                sonoA = sonoB;
+                sonoB = swap;
+                java.util.Arrays.fill(sonoPeak, -200);
+            }
+            sonoA.MRY(g, x, y);
+        } catch (Throwable failure) {
+            sonoFailed = true;
+            freeSono();
+            MasterBoPanels.MOD.log("Master Bo could not draw the spectrogram", failure);
+        }
+    }
+
     private void paintCurve(SYo g, double[] values, double gx, double gy, double gh, double barW, iok colour, boolean filled) {
         int n = values.length;
         double bottom = gy + gh;
@@ -506,6 +722,9 @@ final class MasterBoWidget extends dve implements drv {
         specMoveHit = null;
         gonioMoveHit = null;
         if (specOwnH > 0) paintSpectrumOwn(g, font, text, ascent);
+        sonoMoveHit = null;
+        sonoHits.clear();
+        if (sonoPartH > 0) paintSpectrogram(g, font, text, ascent, sonoY());
         if (gonioH > 0) paintGonio(g, font, text, ascent, specY + specH - gonioH, true);
     }
 
@@ -2103,6 +2322,15 @@ final class MasterBoWidget extends dve implements drv {
                 if (gonioMoveHit != null && in(x, y, gonioMoveHit[0], gonioMoveHit[1], gonioMoveHit[2], gonioMoveHit[3])) return new Act(this::moveSpectrum);
                 if (gonioCollapsed) return new Act(() -> setGonioCollapsed(false));
                 if (y < specY + specH - eLY(SPEC_STRIP)) return new Act(() -> setGonioCollapsed(true)); // the plot: fold it
+                return null;
+            }
+            if (sonoPartH > 0 && in(x, y, specX, sonoY(), specW, sonoPartH)) { // the spectrogram: its strip, move, fold, open
+                if (sonoMoveHit != null && in(x, y, sonoMoveHit[0], sonoMoveHit[1], sonoMoveHit[2], sonoMoveHit[3])) return new Act(this::moveSpectrum);
+                if (sonoCollapsed) return new Act(() -> setSonoCollapsed(false));
+                for (double[] r : sonoHits)
+                    if (in(x, y, r[0], r[1], r[2], r[3]))
+                        return new Act(r[4] == 0 ? model::nextSonoSlope : r[4] == 1 ? model::nextSonoSpeed : model::nextSonoGradient);
+                if (y < sonoY() + sonoPartH - eLY(SPEC_STRIP)) return new Act(() -> setSonoCollapsed(true)); // the picture: fold it
                 return null;
             }
             if (specOwnH > 0 && in(x, y, specX, specY, specW, specOwnH)) { // the spectrum: its strip chooses the slope and moves it

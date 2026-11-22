@@ -28,6 +28,9 @@ It isn't a tab of the lower panels or a view of the Streamlined Views stack. Wit
   - Its faces are in Bitwig's theme greys: the darkest grey for the face, the theme's text for the printing and needle, the theme's clipping red for the red zone, and a lighter grey for the strip at the bottom with the channel and the reference. A custom theme follows.
   - Left and right have a face each; where there is room for one face only, both needles share it (left in the text colour, right in Bitwig's orange), labelled L/R.
   - **Click the reference's value** (orange, on the strip) to choose 0 VU: -18 dBFS (the default), -14, -12, -9 or -20 dBFS. -9 dBFS is +4 dBu on an interface where 0 dBFS = +13 dBu. The choice is kept in bo Master's settings.
+- **Spectrogram:** with **bo Spectrum** on a track, the master's spectrum over time, between the spectrum and the goniometer: 20 Hz to 20 kHz from left to right, the newest sound at the top. It uses bo Spectrum's stereo signal and stands still while the audio engine is off.
+  - Its strip: **Slope** (0, 3 or 4.5 dB per octave, apart from the spectrum's), **Speed** (1x to 8x: 15 to 120 rows a second; between rows each frequency keeps its highest level) and the colours: **Default** (from the strip's grey through Bitwig's orange to white), **B/W** and **Magma**. Click a value for the next one; the choices are kept.
+  - A click on the picture folds it to a bar; a click on the bar opens it again.
 - **Header:** the master's colour and name. Click it to select the master track, so the device panel shows its chain.
 - **Inserts:** the master's devices in chain order.
   - The dot switches a device on (yellow, as on Bitwig's device headers) or off (grey).

@@ -4,7 +4,7 @@
     "id": "master-bo",
     "name": "Panel: bo Master",
     "area": "Panel",
-    "version": "0.1.0-dev.82",
+    "version": "0.1.0-dev.89",
     "author": "Bo",
     "description": "A panel beside the browser side with the master track's strip: VU meter, LUFS (from bo LUFS), fader, pan, peak and RMS meters with peak hold, and the master's inserts with their windows.",
     "documentation": "readme"

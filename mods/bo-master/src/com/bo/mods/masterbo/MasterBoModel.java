@@ -208,6 +208,7 @@ final class MasterBoModel {
                                       : new double[][] {curve, curveM, curveS, curveH, curveMH, curveSH})
             for (double v : a) sig = sig * 31 + Math.round(v * 4);
         sig = sig * 31 + (msMode ? 1 : 2) + (thirdOctave ? 4 : 8) + (holdOn ? 16 : 32) + 64 * holdChoice;
+        sig = sig * 31 + sonoFrame + 7 * sonoSlope + 31 * sonoSpeed + 127 * sonoGradient; // the spectrogram: a new row each refresh
         for (double v : lufs) sig = sig * 31 + Math.round(v * 10);
         sig = sig * 31 + Math.round(lufsRef * 10);
         if (sig == lastSignature) return false;
@@ -1165,7 +1166,21 @@ final class MasterBoModel {
         return analysers.size() >= 3;
     }
 
+    /** Whether the project's audio engine is on (connected): without it the spectrogram stands still. */
+    boolean engineOn = true;
+
+    private void readEngine() {
+        try {
+            pHd project = window.mtS();
+            Object state = project == null ? null : project.FFu().getValue(); // FFu(): the engine's connection (NOT_CONNECTED, CONNECTING, CONNECTED)
+            engineOn = state == bitwig.obf.MQ2.Hnt;                              // MQ2.Hnt: CONNECTED
+        } catch (Throwable failure) {
+            engineOn = true; // unknown: as before
+        }
+    }
+
     private void readSpectrum() {
+        readEngine();
         long now = System.currentTimeMillis();
         if (now >= spectrumSearchAt) {
             spectrumSearchAt = now + 1000;
@@ -1204,6 +1219,10 @@ final class MasterBoModel {
                     updateHold(curveM, curveMH, curveMT, dt, ms);
                     updateHold(curveS, curveSH, curveST, dt, ms);
                 }
+            }
+            if (sonoOn && engineOn) { // the spectrogram: its own curve (stereo), with its own slope, not smoothed
+                computeCurve(main.cfM(), main.FzB(), sonoCurve, -1, SLOPES[sonoSlope]);
+                sonoFrame++;
             }
         } catch (Throwable failure) {
             debug("spectrum read failed: " + failure);
@@ -1301,6 +1320,39 @@ final class MasterBoModel {
         return 17 + 10 * Math.log10(hz / 1000);
     }
 
+    // ---------- The spectrogram (bo Master's own display, from BO Spectrum's stereo analyser) ----------
+    // Its own slope, speed (rows a second) and colour gradient, kept in bo Master's settings.
+    final double[] sonoCurve = new double[CURVE_N]; // the latest row: CURVE_N points, 20 Hz .. 20 kHz, in dB (slope applied)
+    long sonoFrame;                                  // counts the refreshes that computed a row
+    boolean sonoOn;                                  // set by the widget: the spectrogram is shown (open)
+    static final double[] SONO_SPEEDS = {15, 30, 60, 120};        // rows a second
+    static final String[] SONO_SPEED_LABELS = {"1x", "2x", "4x", "8x"};
+    static final String[] SONO_GRADIENTS = {"Default", "B/W", "Magma"};
+    int sonoSlope = readInt("sono_slope", 2, 3);
+    int sonoSpeed = readInt("sono_speed", 1, 4);
+    int sonoGradient = readInt("sono_colours", 0, 3); // a new key: the order changed, everyone starts on Default
+
+    private static int readInt(String key, int fallback, int count) {
+        try {
+            int v = MasterBoPanels.MOD.settings().getInt(key, fallback);
+            return v >= 0 && v < count ? v : fallback;
+        } catch (Throwable failure) {
+            return fallback;
+        }
+    }
+
+    private static void keepInt(String key, int v) {
+        try {
+            MasterBoPanels.MOD.settings().putInt(key, v);
+        } catch (Throwable failure) {
+            MasterBoPanels.MOD.log("Master Bo could not keep " + key, failure);
+        }
+    }
+
+    void nextSonoSlope() { sonoSlope = (sonoSlope + 1) % SLOPES.length; keepInt("sono_slope", sonoSlope); }
+    void nextSonoSpeed() { sonoSpeed = (sonoSpeed + 1) % SONO_SPEEDS.length; keepInt("sono_speed", sonoSpeed); }
+    void nextSonoGradient() { sonoGradient = (sonoGradient + 1) % SONO_GRADIENTS.length; keepInt("sono_colours", sonoGradient); }
+
     int slopeChoice = readSlope(); // 0: 0 dB/oct, 1: 3 dB/oct, 2: 4.5 dB/oct (pivot 1 kHz)
     static final double[] SLOPES = {0, 3, 4.5};
     static final String[] SLOPE_LABELS = {"0 dB", "3 dB", "4.5 dB"};
@@ -1385,10 +1437,14 @@ final class MasterBoModel {
      * dB as an FFT plot reads (the same level as the Plot bars had), plus the slope; falling 24 dB/s.
      */
     private void computeCurve(float[] bins, double sampleRate, double[] out, double dt) {
+        computeCurve(bins, sampleRate, out, dt, SLOPES[slopeChoice]);
+    }
+
+    /** dt < 0: no falling off (each value as it is now), as the spectrogram draws it. */
+    private void computeCurve(float[] bins, double sampleRate, double[] out, double dt, double slope) {
         if (bins == null || bins.length < 8 || !(sampleRate > 1000)) return;
         int n = bins.length;
         double binHz = sampleRate / 2 / (n - 1);
-        double slope = SLOPES[slopeChoice];
         double half = Math.pow(2, 1 / 12.0);
         for (int p = 0; p < CURVE_N; p++) {
             double fc = curveHz(p);
@@ -1413,7 +1469,7 @@ final class MasterBoModel {
             }
             double dB = power > 1e-20 ? 10 * Math.log10(power) : -200;
             if (dB > -199) dB += slope * Math.log(fc / 1000) / Math.log(2);
-            out[p] = Math.max(dB, out[p] - 24 * dt);
+            out[p] = dt < 0 ? dB : Math.max(dB, out[p] - 24 * dt);
         }
     }
 
