@@ -8,7 +8,7 @@ A panel with the master track's strip: a VU meter, fader, pan, peak and RMS mete
 
 Its greys come from Bitwig's theme, so a custom theme changes them as it changes Bitwig's own panels; so do the orange, the meter colours and the text. Fixed on purpose: the VU's White and Vintage styles, the spectrum's blue, and the dark text on a bright track colour or a lit button.
 
-![bo Master beside the master strip of Bitwig's mixer](media/bo-master-panel.png)
+![bo Master beside the Arranger, with bo Spectrum, bo Scope and bo LUFS in the device panel](media/bo-master.png)
 
 ## Where it appears
 
