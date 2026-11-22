@@ -4,7 +4,7 @@ Mods and devices for Bitwig Studio. They run with the Patchbay mod loader (BML) 
 
 <table>
   <tr>
-    <td valign="top"><img src="mods/bo-master/media/bo-master.png" alt="bo Master beside the Arranger, with bo Spectrum, bo Scope and bo LUFS" width="480"></td>
+    <td valign="top"><img src="mods/bo-master/media/bo-master-panel.png" alt="bo Master" height="530"></td>
     <td valign="top">
       <img src="devices/bo-safety/media/bo-safety.png" alt="bo Safety" height="293">
       <img src="mods/save-incrementally/media/file-menu.png" alt="Save Incrementally in the File menu" height="293"><br>
