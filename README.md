@@ -72,3 +72,5 @@ All downloads are also on the [Releases](https://github.com/bo3k/bo-bitwig/relea
 ---
 
 Building from source: [BUILDING.md](BUILDING.md).
+
+Licence: [MIT](LICENSE), © 2026 Bo.
