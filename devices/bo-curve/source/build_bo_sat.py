@@ -228,13 +228,38 @@ BITWIG_PANEL = .2706                 # Bitwig's device panel grey (69 / 255, mea
 # full-panel drawings appear this far (px) from where the panel image puts the same point: measured on a
 # Bitwig screenshot (six knob pointers, residual < .3 px), compensated in the vintage overlay
 DRAW_OFFSET = (-1.1, -0.94)
+# Vintage knob pointers: images, one per step, each shown by a panel rule on the knob's value. Panel rules
+# run in Bitwig's interface, so the pointers follow the knobs also while the device is bypassed (the
+# drawings only get the DSP's data, which stops then). An odd count puts a step on every default and
+# centre. A rule sees a value in its parameter's units (Drive: the cube root of its dB value) and
+# can't read negative decimals, so the centred knobs are shifted to positive first.
+POINTER_STEPS = 49
+POINTER_RULE = {            # knob -> (expression of its value, its span from the start of the knob)
+    "curve": ("CURVE", 100.), "mix": ("MIX", 100.), "asym": ("ASYM+100", 200.),
+    "tone": ("TONE+12", 24.), "output": ("OUTPUT+24", 36.), "drive": ("DRIVE", 48 ** (1 / 3)),
+}
+
+
+def pointer_rule(port, j):
+    """The rule for step j (0 .. POINTER_STEPS-1) of a knob's pointer: its value between the half steps."""
+    expr, span = POINTER_RULE[port]
+    n = POINTER_STEPS - 1
+    lo, hi = span * (j - .5) / n, span * (j + .5) / n
+    f = lambda x: f"{x:.6f}".rstrip("0").rstrip(".")
+    if j == 0:
+        return f"{expr}<{f(hi)}"
+    if j == n:
+        return f"{expr}>={f(lo)}"
+    return f"{expr}>={f(lo)} && {expr}<{f(hi)}"
 
 
 def add_vintage(dev):
     """Vintage skin (SKIN==2) from the user's reference image, prepared by make_sat_background.py:
     the image above the controls (its pointers and the lit lamp painted out), copies of the knobs under
-    its knobs, a three-segment Mode button group under the S / T / B keys, and transparent overlays:
-    turning pointers, the lamp over the active mode, the transfer curve (positive half) in the chart."""
+    its knobs, the knob pointers (images switched by panel rules), a three-segment Mode button group
+    under the S / T / B keys, and transparent overlays:
+    the transfer curve (positive half) in the chart. The pointers and the lamp over the active mode are
+    images switched by panel rules, so they follow the controls also while the device is bypassed."""
     import base64
     import io
     import json
@@ -253,6 +278,8 @@ def add_vintage(dev):
     def f2(x, y):
         return f"float2({x:.3f}, {y:.3f})"
 
+    pointers = {}                        # id tag -> [(knob, step, svg)]
+    lamps = {}                           # id tag -> [svg for Mode 0, 1, 2]
     VARIANTS = [(VINTAGE_DIR, 2, "V")]   # folder, skin index, id tag (more lightings: add (folder, 3, "VB"), ...)
     head = "uniform float4 audioLow;\nuniform float4 audioMedium;\nuniform float4 audioHigh;\n\n"
     dev.images = []
@@ -270,30 +297,26 @@ def add_vintage(dev):
                f'xlink:href="{uri}"/></svg>')
         dev.images.append((svg, (0, 0, VW, VH), 1000, 1.0, 1.0))
 
-        # knob positions 0..1 from the display data (defaults before the first data arrive)
-        value = {
-            "curve": "audioHigh.w",
-            "asym": "(audioHigh.x + 1.) * .5",
-            "drive": "pow(clamp(8.685889638 * log(max(audioLow.x, 1e-6)) / 48., 0., 1.), 1. / 3.)",
-            "output": "(8.685889638 * log(max(audioLow.w, 1e-6)) + 24.) / 36.",
-            "tone": "(audioMedium.z + 12.) / 24.",
-            "mix": "audioLow.z",
-        }
-        default = {"curve": .25, "asym": .5, "drive": 0., "output": 24 / 36, "tone": .5, "mix": 1.}
+        # knob pointers: images switched by panel rules (POINTER_STEPS per knob), so they follow the
+        # knobs in the interface, also while the device is bypassed (the overlay only gets DSP data)
         bar = g["bar_rgb"]
         sweep = g.get("sweep", 180)
         knob_rects = {}
-        # Everything turning or lighting up is drawn in one full-panel overlay, in panel px. Small
-        # per-knob drawings came out shifted by up to 5 px in Bitwig; the full-panel drawing sits at a
-        # constant offset from the image, measured on a screenshot and corrected by DRAW_OFFSET.
-        calls = []
-        kx1 = 0.
+        ink = "#%02x%02x%02x" % tuple(int(round(c * 255)) for c in bar)
+        hw = g["bar_half_width"] * sx
+        pw_, ph_ = VW * 4, VH * 4
         for port, k in g["knobs"].items():
             cx, cy, r = k["c"][0] * sx, k["c"][1] * sy, k["r"] * sx
             knob_rects[port] = unit_rect(cx - r - 3, cy - r - 3, 2 * r + 6, 2 * r + 6)
-            kx1 = max(kx1, cx + r + 2)
-            calls.append(f"        cov = max(cov, boPtr(p, {f2(cx, cy)}, {r - 0.45:.3f}, live ? clamp({value[port]}, 0., 1.) : "
-                         f"{default[port]:.4f}, sc));")
+            for j in range(POINTER_STEPS):
+                v = j / (POINTER_STEPS - 1)
+                a = math.radians(-sweep / 2 + sweep * v)
+                dx, dy = math.sin(a), -math.cos(a)
+                r0, r1 = 0.75 * sx, r - 0.45
+                svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{pw_}" height="{ph_}" viewBox="0 0 {pw_} {ph_}">'
+                       f'<line x1="{cx + r0 * dx:.2f}" y1="{cy + r0 * dy:.2f}" x2="{cx + r1 * dx:.2f}" y2="{cy + r1 * dy:.2f}" '
+                       f'stroke="{ink}" stroke-width="{2 * hw:.2f}" stroke-linecap="butt"/></svg>')
+                pointers.setdefault(tag, []).append((port, j, svg))
         # lamp over the active mode (S / T / B), from the polynomial fit of the lit lamp
         lamp = g["lamp"]
         cs = [(c[0] * sx, c[1] * sy) for c in lamp["centres"]]
@@ -306,8 +329,42 @@ def add_vintage(dev):
                 m = "*".join(["u"] * i + ["v"] * j) or "1."
                 parts.append(f"{c:+.5f}*{m}")
             chans.append(" ".join(parts))
-        lx0, lx1 = cs[0][0] - 3 * R, cs[2][0] + 3 * R
-        ly0, ly1 = cs[0][1] - 3 * R, cs[0][1] + 3 * R
+        # the lit lamp, one image per mode (S / T / B), switched by panel rules on Mode, so it follows
+        # the buttons also while the device is bypassed: rendered at 2x as the overlay drew it (the
+        # fitted colours on the cap, a faint warm halo round it)
+        import numpy as np
+        S2 = 2                                            # supersampling: image px per panel px
+        half = 3 * R
+        size = int(math.ceil(2 * half * S2))
+        for m, (lcx, lcy) in enumerate(cs):
+            ox, oy = lcx - half, lcy - half               # the image's top left (panel px)
+            yy, xx = np.mgrid[0:size, 0:size]
+            px, py = ox + (xx + .5) / S2, oy + (yy + .5) / S2
+            qx, qy = (px - lcx) / R, (py - lcy) / R
+            u, v = np.clip(qx, -1, 1), np.clip(qy, -1, 1)
+            lit = []
+            for ci in range(3):
+                acc = np.zeros_like(u)
+                for (i, j), c in zip(terms, lamp["coef"][ci]):
+                    acc = acc + c * u ** i * v ** j
+                lit.append(np.clip(acc, 0, 1))
+            rr = np.hypot(qx, qy) * R
+            cov = np.clip((R - .15 - rr) * S2 + .5, 0, 1)
+            halo = .22 * np.exp(-np.maximum(rr - R, 0) * .9) * (1 - cov)
+            warm = (1., .78, .25)
+            alpha = np.clip(cov + halo, 0, 1)
+            rgb = [lit[ci] * cov + warm[ci] * halo for ci in range(3)]          # premultiplied
+            rgba = np.zeros((size, size, 4), np.uint8)
+            for ci in range(3):
+                rgba[..., ci] = np.round(np.where(alpha > 0, rgb[ci] / np.maximum(alpha, 1e-6), 0) * 255).clip(0, 255)
+            rgba[..., 3] = np.round(alpha * 255)
+            buf = io.BytesIO()
+            Image.fromarray(rgba, "RGBA").save(buf, "PNG", optimize=True)
+            luri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+            lamps.setdefault(tag, []).append(
+                f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{VW * 4}" '
+                f'height="{VH * 4}" viewBox="0 0 {VW * 4} {VH * 4}"><image x="{ox:.3f}" y="{oy:.3f}" '
+                f'width="{2 * half:.3f}" height="{2 * half:.3f}" href="{luri}" xlink:href="{luri}"/></svg>')
         # transfer curve in the chart (input amplitude a0..a1 -> output b0..b1), dark grey ink
         ch = g["chart"]
         X0, X1, Y0, Y1 = ch["x0"] * sx, ch["x1"] * sx, ch["y0"] * sy, ch["y1"] * sy
@@ -318,45 +375,9 @@ def add_vintage(dev):
         az, bz = (a0 + a1) / 2, (b0 + b1) / 2
         disp = (HERE / "bo_sat_display.sksl").read_text()
         funcs = disp[disp.index("// same curve as the DSP"):disp.index("float boLine(")]
-        # pointer: from just off the centre to the cap edge over the printed scale's sweep
-        # (270 degrees: 0 at 7:30, the middle at 12, 1 at 4:30)
-        src = head + funcs + f"""float boPtr(float2 p, float2 c, float len, float v, float sc) {{
-    float2 q = p - c;
-    if (dot(q, q) > (len + 2.) * (len + 2.)) {{
-        return 0.;
-    }}
-    float a = radians({-sweep / 2:.1f} + {sweep:.1f} * v);
-    float2 d = float2(sin(a), -cos(a));
-    float2 n = float2(-d.y, d.x);
-    float along = dot(q, d);
-    float dist = max(max({0.75 * sx:.3f} - along, along - len), abs(dot(q, n)) - {g['bar_half_width'] * sx:.3f});
-    return clamp(.5 - dist * sc, 0., 1.);
-}}
-
-half4 main(float2 fragCoord) {{
+        src = head + funcs + f"""half4 main(float2 fragCoord) {{
     float sc = iResolution.x / {VW * 4}.;
     float2 p = fragCoord / sc + {f2(*DRAW_OFFSET)};          // panel-image px
-    // knob pointers
-    if (p.x < {kx1:.1f}) {{
-        bool live = audioLow.x > .5;
-        float cov = 0.;
-""" + "\n".join(calls) + f"""
-        return half4(float3({bar[0]:.4f}, {bar[1]:.4f}, {bar[2]:.4f}) * cov, cov);
-    }}
-    // lamp
-    if (p.x > {lx0:.1f} && p.x < {lx1:.1f} && p.y > {ly0:.1f} && p.y < {ly1:.1f}) {{
-        float m = floor(audioHigh.z + .5);
-        float2 c = m < .5 ? {f2(*cs[0])} : (m < 1.5 ? {f2(*cs[1])} : {f2(*cs[2])});
-        float2 q = (p - c) / {R:.4f};
-        float u = clamp(q.x, -1., 1.);
-        float v = clamp(q.y, -1., 1.);
-        float3 lit = clamp(float3({chans[0]}, {chans[1]}, {chans[2]}), 0., 1.);
-        float rr = length(q) * {R:.4f};
-        float cov = clamp(({R:.4f} - .15 - rr) * sc + .5, 0., 1.);
-        // a faint warm halo on the plate
-        float halo = .22 * exp(-max(rr - {R:.4f}, 0.) * .9) * (1. - cov);
-        return half4(lit * cov + float3(1., .78, .25) * halo, cov + halo);
-    }}
     // transfer curve
     if (p.x > {X0 - 2:.1f} && p.x < {X1 + 2:.1f} && p.y > {Y1 - 2:.1f} && p.y < {Y0 + 2:.1f}) {{
         float sX = p.x < {XZ:.4f} ? {(XZ - X0) / (az - a0):.4f} : {(X1 - XZ) / (a1 - az):.4f};    // px per unit
@@ -387,7 +408,11 @@ half4 main(float2 fragCoord) {{
         knob_rects = variant(D_, tag_)
 
     btn = g["buttons"]
-    brect = unit_rect(btn[0] * sx, btn[1] * sy, (btn[2] - btn[0]) * sx, (btn[3] - btn[1]) * sy)
+    # the Mode buttons reach up over the lamps: with the device bypassed Bitwig only redraws what a
+    # control covers when it changes, so the lamps have to lie inside the buttons' area to light up
+    lamp_top = min(c[1] for c in g["lamp"]["centres"]) * sy - 3 * g["lamp"]["r"] * sx
+    btop = min(btn[1] * sy, lamp_top)
+    brect = unit_rect(btn[0] * sx, btop, (btn[2] - btn[0]) * sx, btn[3] * sy - btop)
     sw = g.get("switch")
     sc_ = g.get("screw", [441.7, 296.5, 29.0])            # screw head: centre, radius (source px)
     scx, scy, scr = sc_[0] * sx, sc_[1] * sy, sc_[2] * sx
@@ -428,7 +453,7 @@ half4 main(float2 fragCoord) {{
 
     def hook(root, base_knobs):
         from bwobj import Obj, Field, Ref
-        from bwgen import text, ref, u16, u8, obj, flag, lst, rect as grect
+        from bwgen import text, ref, u16, u8, obj, flag, lst, f64, rect as grect
         panel = root.get(0x1845)[0]
         items = panel.get(0x1844).get(0x184D)
 
@@ -480,6 +505,22 @@ half4 main(float2 fragCoord) {{
             i = items.index(bgs[0])
             items[i:i] = ws
             exprs.append(rule(f"SKIN=={k_}", image, 0x18A5))
+            # the knob pointers over the image, one image per step, each shown by its rule
+            ptr_items = []
+            for port, j, svg in pointers[tag_]:
+                w = Obj(0x6B7, [obj(0x1852, grect(0, 0, VW, VH)), flag(0x18A5, True), flag(0x18A6, True),
+                                text(0x1AD3, ""), text(0x1872, ""), text(0x1873, svg), u16(0x1979, 1000),
+                                f64(0x1A6F, 1.0), f64(0x1A70, 1.0)])
+                ptr_items.append(w)
+                exprs.append(rule(f"SKIN=={k_} && {pointer_rule(port, j)}", w, 0x18A5))
+            for m, svg in enumerate(lamps[tag_]):          # the lit lamp over S / T / B
+                w = Obj(0x6B7, [obj(0x1852, grect(0, 0, VW, VH)), flag(0x18A5, True), flag(0x18A6, True),
+                                text(0x1AD3, ""), text(0x1872, ""), text(0x1873, svg), u16(0x1979, 1000),
+                                f64(0x1A6F, 1.0), f64(0x1A70, 1.0)])
+                ptr_items.append(w)
+                exprs.append(rule(f"SKIN=={k_} && MODE=={m}", w, 0x18A5))
+            j_ = items.index(image) + 1
+            items[j_:j_] = ptr_items
             for w in ws:
                 exprs += [rule(f"SKIN=={k_}", w, 0x18A5), rule(f"SKIN=={k_}", w, 0x18A6)]
             for w in items:
@@ -510,7 +551,8 @@ half4 main(float2 fragCoord) {{
                 # stays dark, only the outline changes, so both skins use the plain native button)
                 items.extend(copies)
         panel.field(0x1885).value = exprs
-        print(f"  vintage: {len(VARIANTS)} lightings, mode buttons {brect}, screw {screw_rect}, {len(exprs)} rules")
+        print(f"  vintage: {len(VARIANTS)} lightings, mode buttons {brect}, screw {screw_rect}, "
+              f"{POINTER_STEPS} pointer steps per knob, {len(exprs)} rules")
     return hook
 
 
@@ -546,7 +588,7 @@ def bo_sat_test() -> Device:
                tooltip="Curve type")
     dev.choice("os", "Oversampling", ["Off", "2x", "4x"], default=0, rect=(1, 1, 24, 4), inspector=True, buttons=True,
                tooltip="Oversampling of the saturation curve")
-    dev.prevent_sleep = True                         # the vintage pointers follow the knobs without audio
+    dev.prevent_sleep = True                         # the vintage lamp and curve follow the controls without audio
     skin_hook = add_skins(dev)
     vintage_hook = add_vintage(dev)
 
