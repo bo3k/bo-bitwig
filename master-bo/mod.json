@@ -4,7 +4,7 @@
     "id": "master-bo",
     "name": "Interface: bo Master",
     "area": "Interface",
-    "version": "0.2.0-dev.1",
+    "version": "0.2.0-dev.2",
     "author": "Bo",
     "description": "A panel beside the browser side with the master track's strip: VU meter, LUFS (from bo LUFS), fader, pan, peak and RMS meters with peak hold, and the master's inserts with their windows.",
     "homepage": "https://github.com/bo3k/bo-bitwig/tree/main/mods/bo-master",

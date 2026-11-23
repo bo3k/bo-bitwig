@@ -208,7 +208,7 @@ final class MasterBoModel {
                                       : new double[][] {curve, curveM, curveS, curveH, curveMH, curveSH})
             for (double v : a) sig = sig * 31 + Math.round(v * 4);
         sig = sig * 31 + (msMode ? 1 : 2) + (thirdOctave ? 4 : 8) + (holdOn ? 16 : 32) + 64 * holdChoice;
-        sig = sig * 31 + sonoFrame + 7 * sonoSlope + 31 * sonoSpeed + 127 * sonoGradient; // the spectrogram: a new row each refresh
+        sig = sig * 31 + sonoFrame + 7 * sonoSlope + 31 * sonoSpeed + 127 * sonoGradient + 1021 * sonoOrientation; // the spectrogram: a new row each refresh
         for (double v : lufs) sig = sig * 31 + Math.round(v * 10);
         sig = sig * 31 + Math.round(lufsRef * 10);
         if (sig == lastSignature) return false;
@@ -1327,10 +1327,10 @@ final class MasterBoModel {
     boolean sonoOn;                                  // set by the widget: the spectrogram is shown (open)
     static final double[] SONO_SPEEDS = {15, 30, 60, 120};        // rows a second
     static final String[] SONO_SPEED_LABELS = {"1x", "2x", "4x", "8x"};
-    static final String[] SONO_GRADIENTS = {"Default", "B/W", "Magma"};
+    static final String[] SONO_GRADIENTS = {"Orange", "B/W", "Magma"};   // Magma: matplotlib's colour map of that name
     int sonoSlope = readInt("sono_slope", 2, 3);
     int sonoSpeed = readInt("sono_speed", 1, 4);
-    int sonoGradient = readInt("sono_colours", 0, 3); // a new key: the order changed, everyone starts on Default
+    int sonoGradient = readInt("sono_colours", 0, 3); // a new key: the order changed, everyone starts on Orange
 
     private static int readInt(String key, int fallback, int count) {
         try {
@@ -1351,6 +1351,9 @@ final class MasterBoModel {
 
     void nextSonoSlope() { sonoSlope = (sonoSlope + 1) % SLOPES.length; keepInt("sono_slope", sonoSlope); }
     void nextSonoSpeed() { sonoSpeed = (sonoSpeed + 1) % SONO_SPEEDS.length; keepInt("sono_speed", sonoSpeed); }
+    static final String[] SONO_ORIENTATIONS = {"Down", "Left"};    // the newest at the top, scrolling down / at the right, scrolling left
+    int sonoOrientation = readInt("sono_orientation", 0, 2);
+    void nextSonoOrientation() { sonoOrientation = (sonoOrientation + 1) % SONO_ORIENTATIONS.length; keepInt("sono_orientation", sonoOrientation); }
     void nextSonoGradient() { sonoGradient = (sonoGradient + 1) % SONO_GRADIENTS.length; keepInt("sono_colours", sonoGradient); }
 
     int slopeChoice = readSlope(); // 0: 0 dB/oct, 1: 3 dB/oct, 2: 4.5 dB/oct (pivot 1 kHz)

@@ -304,6 +304,7 @@ final class MasterBoWidget extends dve implements drv {
     private com.bitwig.graphics.qc1 sonoA, sonoB; // sonoA: the one shown
     private int sonoW, sonoH;
     private iok sonoFace;
+    private boolean sonoLeft;
     private long sonoSeen = -1, sonoLastNanos;
     private double sonoDue;                         // rows owed (fractional)
     private final double[] sonoPeak = new double[MasterBoModel.CURVE_N];
@@ -313,7 +314,7 @@ final class MasterBoWidget extends dve implements drv {
     private static final int SONO_STEPS = 64;
     private static final iok BLACK = iok.cfM(0, 0, 0);
 
-    /** The gradient (0 Default, 1 B/W, 2 Magma), from the face at the bottom of the range, in SONO_STEPS steps. */
+    /** The gradient (0 Orange, 1 B/W, 2 Magma), from the face at the bottom of the range, in SONO_STEPS steps. */
     private iok sonoRampFace;
 
     private iok[] sonoRamp(int gradient, iok face) {
@@ -327,7 +328,7 @@ final class MasterBoWidget extends dve implements drv {
             case 2 -> { at = new double[] {0, 0.13, 0.25, 0.38, 0.5, 0.63, 0.75, 0.88, 1};            // Magma (as matplotlib's)
                         stop = new iok[] {BLACK, iok.cfM(28, 16, 68), iok.cfM(79, 18, 123), iok.cfM(129, 37, 129), iok.cfM(181, 54, 122),
                                           iok.cfM(229, 80, 100), iok.cfM(251, 135, 97), iok.cfM(254, 194, 135), iok.cfM(252, 253, 191)}; }
-            default -> { iok accent = theme("Accent (default)", ACCENT);                                // Default: Bitwig's accent, up to white
+            default -> { iok accent = theme("Accent (default)", ACCENT);                                // Orange: Bitwig's accent, up to white
                          at = new double[] {0, 0.35, 0.7, 0.88, 1};
                          stop = new iok[] {BLACK, BLACK.cfM(accent, 0.35F), accent, accent.cfM(iok.cfM(255, 255, 255), 0.5F), iok.cfM(255, 255, 255)}; }
         }
@@ -370,23 +371,42 @@ final class MasterBoWidget extends dve implements drv {
         double ta = tiny.cfM().cfM();
         double strip = eLY(SPEC_STRIP), freqRow = eLY(SPEC_FREQ_ROW);
         rect(g, specX, y, specW, partH, sonoBackground()); // the darker grey of the strips under the VU and the spectrum
-        // the picture: 20 Hz at the left to 20 kHz at the right (log), time downwards
-        double gx = Math.round(specX + eLY(3)), gy = Math.round(y + eLY(4));
-        double gw = Math.round(specX + specW - eLY(3)) - gx, gh = Math.round(partH - strip - freqRow - eLY(4));
-        paintSonoPicture(g, gx, gy, gw, gh);
-        // the frequencies under it
         g.cfM(tiny);
-        double lastRight = -1e9;
-        for (int i = 0; i < SPEC_OCTAVES.length; i++) {
-            double x = Math.round(gx + gw * Math.log(SPEC_OCTAVES[i] / 20) / Math.log(1000));
-            String label = SPEC_OCTAVE_LABELS[i];
-            double lw = tiny.cfM(label).IwV();
-            double lx = Math.max(gx, Math.min(gx + gw - lw, x - lw / 2));
-            if (lx < lastRight + eLY(3)) continue;
-            g.cfM(lx, gy + gh + eLY(2) + ta, label, text.cfM(0.8F));
-            lastRight = lx + lw;
+        if (model.sonoOrientation == 0) {
+            // Down: 20 Hz at the left to 20 kHz at the right (log), the newest row at the top, scrolling down
+            double gx = Math.round(specX + eLY(3)), gy = Math.round(y + eLY(4));
+            double gw = Math.round(specX + specW - eLY(3)) - gx, gh = Math.round(partH - strip - freqRow - eLY(4));
+            paintSonoPicture(g, gx, gy, gw, gh);
+            // the frequencies under it
+            double lastRight = -1e9;
+            for (int i = 0; i < SPEC_OCTAVES.length; i++) {
+                double x = Math.round(gx + gw * Math.log(SPEC_OCTAVES[i] / 20) / Math.log(1000));
+                String label = SPEC_OCTAVE_LABELS[i];
+                double lw = tiny.cfM(label).IwV();
+                double lx = Math.max(gx, Math.min(gx + gw - lw, x - lw / 2));
+                if (lx < lastRight + eLY(3)) continue;
+                g.cfM(lx, gy + gh + eLY(2) + ta, label, text.cfM(0.8F));
+                lastRight = lx + lw;
+            }
+        } else {
+            // Left: 20 Hz at the bottom to 20 kHz at the top (log), the newest column at the right,
+            // scrolling left; the frequencies in a column at its left
+            double labelW = tiny.cfM("20k").IwV() + eLY(4);
+            double gx = Math.round(specX + eLY(3) + labelW), gy = Math.round(y + eLY(4));
+            double gw = Math.round(specX + specW - eLY(3)) - gx, gh = Math.round(partH - strip - eLY(6));
+            paintSonoPicture(g, gx, gy, gw, gh);
+            double lastTop = 1e9;
+            for (int i = 0; i < SPEC_OCTAVES.length; i++) {
+                double yc = Math.round(gy + gh * (1 - Math.log(SPEC_OCTAVES[i] / 20) / Math.log(1000)));
+                String label = SPEC_OCTAVE_LABELS[i];
+                double lw = tiny.cfM(label).IwV();
+                double base = Math.max(gy + ta, Math.min(gy + gh, yc + ta / 2));
+                if (base > lastTop - eLY(2)) continue;
+                g.cfM(gx - eLY(3) - lw, base, label, text.cfM(0.8F));
+                lastTop = base - ta;
+            }
         }
-        // the strip: Slope, Speed and the gradient (a click: the next of each), the move switch
+        // the strip: Slope, Speed, the gradient and the orientation (a click: the next of each), the move switch
         double sTop = y + partH - strip;
         rect(g, specX + 1, sTop, specW - 2, strip - 1, theme("Grey 2", iok.cfM(38, 38, 38)));
         g.cfM(small);
@@ -395,15 +415,25 @@ final class MasterBoWidget extends dve implements drv {
         double tx = specX + eLY(5);
         String[][] items = {{"Slope", MasterBoModel.SLOPE_LABELS[model.sonoSlope]},
                             {"Speed", MasterBoModel.SONO_SPEED_LABELS[model.sonoSpeed]},
-                            {null, MasterBoModel.SONO_GRADIENTS[model.sonoGradient]}};
+                            {null, MasterBoModel.SONO_GRADIENTS[model.sonoGradient]},
+                            {null, MasterBoModel.SONO_ORIENTATIONS[model.sonoOrientation]}};
+        // tight spacing; where everything doesn't fit, the names go, Speed's first, then Slope's
+        double nameGap = eLY(3), itemGap = eLY(7);
+        java.util.function.DoubleSupplier width = () -> {
+            double w = 0;
+            for (String[] it : items) w += (it[0] == null ? 0 : small.cfM(it[0]).IwV() + nameGap) + small.cfM(it[1]).IwV() + itemGap;
+            return w - itemGap;
+        };
+        if (tx + width.getAsDouble() > limit) items[1][0] = null;
+        if (tx + width.getAsDouble() > limit) items[0][0] = null;
         for (int k = 0; k < items.length; k++) {
-            double need = (items[k][0] == null ? 0 : small.cfM(items[k][0]).IwV() + eLY(6)) + small.cfM(items[k][1]).IwV();
+            double need = (items[k][0] == null ? 0 : small.cfM(items[k][0]).IwV() + nameGap) + small.cfM(items[k][1]).IwV();
             if (tx + need > limit) break;
             double start = tx;
-            if (items[k][0] != null) tx = text(g, small, tx, base, items[k][0], text.cfM(0.7F)) + eLY(6);
+            if (items[k][0] != null) tx = text(g, small, tx, base, items[k][0], text.cfM(0.7F)) + nameGap;
             tx = text(g, small, tx, base, items[k][1], orange);
-            sonoHits.add(new double[] {start - eLY(4), sTop, tx - start + eLY(8), strip, k});
-            tx += eLY(12);
+            sonoHits.add(new double[] {start - itemGap / 2, sTop, tx - start + itemGap, strip, k});
+            tx += itemGap;
         }
         double ix = specX + specW - switchW - eLY(2);
         triangle(g, ix + switchW / 2, sTop + strip / 2, specLow, orange);
@@ -421,7 +451,8 @@ final class MasterBoWidget extends dve implements drv {
         try {
             iok face = sonoBackground();
             iok[] ramp = sonoRamp(model.sonoGradient, face);
-            if (sonoA == null || iw != sonoW || ih != sonoH || !face.equals(sonoFace)) { // new size (or face): two images, cleared to the face
+            boolean left = model.sonoOrientation == 1;
+            if (sonoA == null || iw != sonoW || ih != sonoH || !face.equals(sonoFace) || left != sonoLeft) { // new size, face or orientation: two images, cleared to the face
                 freeSono();
                 com.bitwig.graphics.sal system = kI_().hUR(); // the window's graphics system
                 sonoA = system.cfM(iw, ih, com.bitwig.graphics.Jkg.cfM);
@@ -434,6 +465,7 @@ final class MasterBoWidget extends dve implements drv {
                 sonoW = iw;
                 sonoH = ih;
                 sonoFace = face;
+                sonoLeft = left;
                 sonoSeen = -1;
                 sonoDue = 0;
                 java.util.Arrays.fill(sonoPeak, -200);
@@ -448,23 +480,29 @@ final class MasterBoWidget extends dve implements drv {
             if (model.engineOn) sonoDue += dt * MasterBoModel.SONO_SPEEDS[model.sonoSpeed]; // no audio engine: it stands still
             else sonoDue = 0;
             int rows = (int) Math.min(Math.floor(sonoDue), 16);
-            if (rows > 0) { // into the other image: the last one moved down, the new rows on top
+            if (rows > 0) { // into the other image: the last one moved down (left), the new rows at the top (columns at the right)
                 sonoDue -= Math.floor(sonoDue);
                 int n = sonoPeak.length;
                 SYo s = sonoB.cfM();
-                sonoA.MRY(s, 0, rows);
+                if (left) sonoA.MRY(s, -rows, 0);
+                else sonoA.MRY(s, 0, rows);
+                int len = left ? ih : iw;
                 int runStart = 0, runStep = -1;
-                for (int px = 0; px <= iw; px++) {
+                for (int px = 0; px <= len; px++) {
                     int step = -2;
-                    if (px < iw) {
-                        double p = px / (double) (iw - 1) * (n - 1); // the picture is log in frequency, as the curve's points
+                    if (px < len) {
+                        // the picture is log in frequency, as the curve's points (Left: 20 kHz at the top)
+                        double p = (left ? (len - 1 - px) : px) / (double) (len - 1) * (n - 1);
                         int i0 = (int) Math.floor(p), i1 = Math.min(n - 1, i0 + 1);
                         double v = sonoPeak[i0] + (p - i0) * (sonoPeak[i1] - sonoPeak[i0]);
                         double f = (v - (SPEC_TOP_DB - SPEC_RANGE_DB)) / SPEC_RANGE_DB;
                         step = (int) Math.round(Math.max(0, Math.min(1, f)) * (SONO_STEPS - 1));
                     }
                     if (step != runStep) {
-                        if (runStep >= 0 && px > runStart) rect(s, runStart, 0, px - runStart, rows, ramp[runStep]);
+                        if (runStep >= 0 && px > runStart) {
+                            if (left) rect(s, iw - rows, runStart, rows, px - runStart, ramp[runStep]);
+                            else rect(s, runStart, 0, px - runStart, rows, ramp[runStep]);
+                        }
                         runStart = px;
                         runStep = step;
                     }
@@ -2329,7 +2367,7 @@ final class MasterBoWidget extends dve implements drv {
                 if (sonoCollapsed) return new Act(() -> setSonoCollapsed(false));
                 for (double[] r : sonoHits)
                     if (in(x, y, r[0], r[1], r[2], r[3]))
-                        return new Act(r[4] == 0 ? model::nextSonoSlope : r[4] == 1 ? model::nextSonoSpeed : model::nextSonoGradient);
+                        return new Act(r[4] == 0 ? model::nextSonoSlope : r[4] == 1 ? model::nextSonoSpeed : r[4] == 2 ? model::nextSonoGradient : model::nextSonoOrientation);
                 if (y < sonoY() + sonoPartH - eLY(SPEC_STRIP)) return new Act(() -> setSonoCollapsed(true)); // the picture: fold it
                 return null;
             }
