@@ -207,6 +207,7 @@ class Device:
     # look (None = Bitwig default, output unchanged):
     color_tint: tuple = None     # device_contents.color_tint rgba, e.g. (0.86, 0.82, 0.70, 1.0)
     brightness: int = None       # grid_panel_item.brightness (enum Hfk codes): 0 DARK, 1 NORMAL, 2 BRIGHTER, 3 DISPLAY, 4 BRIGHT, 5 DARKER
+    revision: int = 1             # metadata revision_no: raise it with each released change
     knob_style: int = None       # knob_panel_item.knob_style (enum nVz): 0 NORMAL, 1 LIGHTER, 2 LIGHTEST, 3 DARKEST
     knob_pie_color: int = None   # knob_panel_item.pie_color (enum AlY): 0 red, 1 orange, 6 white, 999 default
     label_color: int = None      # knob_panel_item.label_color (enum AlY)
@@ -267,7 +268,7 @@ class Device:
             ("has_audio_input", "b", True), ("has_audio_output", "b", True),
             ("has_note_input", "b", False), ("has_note_output", "b", False),
             ("preset_name", "s", self.name), ("revision_id", "s", hashlib.sha1(body).hexdigest()),
-            ("revision_no", "i", 1), ("suggest_for_audio_input", "b", True),
+            ("revision_no", "i", self.revision), ("suggest_for_audio_input", "b", True),
             ("suggest_for_note_input", "b", False), ("tags", "s", self.tags),
             ("type", "s", "application/bitwig-device"),
         ]

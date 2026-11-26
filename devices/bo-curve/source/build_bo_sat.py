@@ -233,7 +233,7 @@ DRAW_OFFSET = (-1.1, -0.94)
 # drawings only get the DSP's data, which stops then). An odd count puts a step on every default and
 # centre. A rule sees a value in its parameter's units (Drive: the cube root of its dB value) and
 # can't read negative decimals, so the centred knobs are shifted to positive first.
-POINTER_STEPS = 49
+POINTER_STEPS = 25          # 25: the fewest that still turn smoothly (17 too coarse); each step is an image, so more cost load time
 POINTER_RULE = {            # knob -> (expression of its value, its span from the start of the knob)
     "curve": ("CURVE", 100.), "mix": ("MIX", 100.), "asym": ("ASYM+100", 200.),
     "tone": ("TONE+12", 24.), "output": ("OUTPUT+24", 36.), "drive": ("DRIVE", 48 ** (1 / 3)),
@@ -305,18 +305,44 @@ def add_vintage(dev):
         ink = "#%02x%02x%02x" % tuple(int(round(c * 255)) for c in bar)
         hw = g["bar_half_width"] * sx
         pw_, ph_ = VW * 4, VH * 4
+        # Knobs whose centres sit at (nearly) the same spot inside their unit rects share one set of
+        # pointer images: the same SVG text, drawn from the image's own origin (no viewBox offset).
+        # Bitwig rasterises every image when it builds the device view; full-panel images for each
+        # knob made loading and track switching take seconds.
+        kinfo = {}
         for port, k in g["knobs"].items():
             cx, cy, r = k["c"][0] * sx, k["c"][1] * sy, k["r"] * sx
             knob_rects[port] = unit_rect(cx - r - 3, cy - r - 3, 2 * r + 6, 2 * r + 6)
+            ux, uy, _, _ = knob_rects[port]
+            kinfo[port] = (cx - ux * 4, cy - uy * 4, r)
+        groups = []                                   # [[port, ...]], offsets and radii within 0.6 px
+        for port, (ox_, oy_, r) in kinfo.items():
+            for grp in groups:
+                gx, gy, gr = kinfo[grp[0]]
+                if abs(ox_ - gx) < .6 and abs(oy_ - gy) < .6 and abs(r - gr) < .6:
+                    grp.append(port); break
+            else:
+                groups.append([port])
+        for grp in groups:
+            ox_ = sum(kinfo[p][0] for p in grp) / len(grp)
+            oy_ = sum(kinfo[p][1] for p in grp) / len(grp)
+            r = sum(kinfo[p][2] for p in grp) / len(grp)
+            uw = max(knob_rects[p][2] for p in grp); uh = max(knob_rects[p][3] for p in grp)
+            for p in grp:
+                ux, uy, _, _ = knob_rects[p]
+                knob_rects[p] = (ux, uy, uw, uh)
             for j in range(POINTER_STEPS):
                 v = j / (POINTER_STEPS - 1)
                 a = math.radians(-sweep / 2 + sweep * v)
                 dx, dy = math.sin(a), -math.cos(a)
                 r0, r1 = 0.75 * sx, r - 0.45
-                svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{pw_}" height="{ph_}" viewBox="0 0 {pw_} {ph_}">'
-                       f'<line x1="{cx + r0 * dx:.2f}" y1="{cy + r0 * dy:.2f}" x2="{cx + r1 * dx:.2f}" y2="{cy + r1 * dy:.2f}" '
+                svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{uw * 4}" height="{uh * 4}" '
+                       f'viewBox="0 0 {uw * 4} {uh * 4}">'
+                       f'<line x1="{ox_ + r0 * dx:.2f}" y1="{oy_ + r0 * dy:.2f}" x2="{ox_ + r1 * dx:.2f}" y2="{oy_ + r1 * dy:.2f}" '
                        f'stroke="{ink}" stroke-width="{2 * hw:.2f}" stroke-linecap="butt"/></svg>')
-                pointers.setdefault(tag, []).append((port, j, svg))
+                for p in grp:
+                    pointers.setdefault(tag, []).append((p, j, svg, knob_rects[p]))
+        print(f"  pointer sets: {groups}")
         # lamp over the active mode (S / T / B), from the polynomial fit of the lit lamp
         lamp = g["lamp"]
         cs = [(c[0] * sx, c[1] * sy) for c in lamp["centres"]]
@@ -361,10 +387,15 @@ def add_vintage(dev):
             buf = io.BytesIO()
             Image.fromarray(rgba, "RGBA").save(buf, "PNG", optimize=True)
             luri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-            lamps.setdefault(tag, []).append(
-                f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{VW * 4}" '
-                f'height="{VH * 4}" viewBox="0 0 {VW * 4} {VH * 4}"><image x="{ox:.3f}" y="{oy:.3f}" '
-                f'width="{2 * half:.3f}" height="{2 * half:.3f}" href="{luri}" xlink:href="{luri}"/></svg>')
+            # cropped to the lamp, drawn from the image's own origin, and kept inside the Mode
+            # buttons' area (bypassed, Bitwig only redraws what the changed control covers)
+            lr = unit_rect(ox, oy, 2 * half, 2 * half)
+            bx1 = math.ceil(g["buttons"][2] * sx / 4)
+            lr = (lr[0], lr[1], min(lr[0] + lr[2], bx1) - lr[0], lr[3])
+            lamps.setdefault(tag, []).append((
+                f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{lr[2] * 4}" '
+                f'height="{lr[3] * 4}" viewBox="0 0 {lr[2] * 4} {lr[3] * 4}"><image x="{ox - lr[0] * 4:.3f}" y="{oy - lr[1] * 4:.3f}" '
+                f'width="{2 * half:.3f}" height="{2 * half:.3f}" href="{luri}" xlink:href="{luri}"/></svg>', lr))
         # transfer curve in the chart (input amplitude a0..a1 -> output b0..b1), dark grey ink
         ch = g["chart"]
         X0, X1, Y0, Y1 = ch["x0"] * sx, ch["x1"] * sx, ch["y0"] * sy, ch["y1"] * sy
@@ -408,11 +439,13 @@ def add_vintage(dev):
         knob_rects = variant(D_, tag_)
 
     btn = g["buttons"]
-    # the Mode buttons reach up over the lamps: with the device bypassed Bitwig only redraws what a
-    # control covers when it changes, so the lamps have to lie inside the buttons' area to light up
+    brect = unit_rect(btn[0] * sx, btn[1] * sy, (btn[2] - btn[0]) * sx, (btn[3] - btn[1]) * sy)
+    # a second Mode control over the lamps: with the device bypassed Bitwig only redraws what a control
+    # covers when it changes, so the lamps lie inside this one. (Stretching the buttons themselves up
+    # over the lamps moved Bitwig's buttons there, away from the S / T / B keys.)
     lamp_top = min(c[1] for c in g["lamp"]["centres"]) * sy - 3 * g["lamp"]["r"] * sx
-    btop = min(btn[1] * sy, lamp_top)
-    brect = unit_rect(btn[0] * sx, btop, (btn[2] - btn[0]) * sx, btn[3] * sy - btop)
+    lamp_bot = max(c[1] for c in g["lamp"]["centres"]) * sy + 3 * g["lamp"]["r"] * sx
+    lamp_rect = unit_rect(btn[0] * sx, lamp_top, (btn[2] - btn[0]) * sx, lamp_bot - lamp_top)
     sw = g.get("switch")
     sc_ = g.get("screw", [441.7, 296.5, 29.0])            # screw head: centre, radius (source px)
     scx, scy, scr = sc_[0] * sx, sc_[1] * sy, sc_[2] * sx
@@ -497,7 +530,9 @@ def add_vintage(dev):
                                  text(0x1AD3, "Skin"), text(0x292F, ""), u8(0x2932, 0), ref(0x184C, skin_param),
                                  u16(0x2B04, 0x1C9), flag(0x186F, True), u8(0x1870, 0), u8(0x1871, 0), u8(0x1D7C, 0),
                                  u16(0x279F, 1)])
-            ws = vknobs + [group, screwg]
+            lamp_group = clone(group)
+            lamp_group.field(0x1852).value = grect(*lamp_rect)
+            ws = vknobs + [lamp_group, group, screwg]
             if sw:
                 vlink = clone(toggle)
                 vlink.field(0x1852).value = grect(*switch_rect)
@@ -507,14 +542,16 @@ def add_vintage(dev):
             exprs.append(rule(f"SKIN=={k_}", image, 0x18A5))
             # the knob pointers over the image, one image per step, each shown by its rule
             ptr_items = []
-            for port, j, svg in pointers[tag_]:
-                w = Obj(0x6B7, [obj(0x1852, grect(0, 0, VW, VH)), flag(0x18A5, True), flag(0x18A6, True),
+            for port, j, svg, pr in pointers[tag_]:
+                # hidden to start with: the rules then only switch on the one step per knob, instead
+                # of switching off all the others each time the device view is built
+                w = Obj(0x6B7, [obj(0x1852, grect(*pr)), flag(0x18A5, False), flag(0x18A6, True),
                                 text(0x1AD3, ""), text(0x1872, ""), text(0x1873, svg), u16(0x1979, 1000),
                                 f64(0x1A6F, 1.0), f64(0x1A70, 1.0)])
                 ptr_items.append(w)
                 exprs.append(rule(f"SKIN=={k_} && {pointer_rule(port, j)}", w, 0x18A5))
-            for m, svg in enumerate(lamps[tag_]):          # the lit lamp over S / T / B
-                w = Obj(0x6B7, [obj(0x1852, grect(0, 0, VW, VH)), flag(0x18A5, True), flag(0x18A6, True),
+            for m, (svg, lr) in enumerate(lamps[tag_]):    # the lit lamp over S / T / B
+                w = Obj(0x6B7, [obj(0x1852, grect(*lr)), flag(0x18A5, False), flag(0x18A6, True),
                                 text(0x1AD3, ""), text(0x1872, ""), text(0x1873, svg), u16(0x1979, 1000),
                                 f64(0x1A6F, 1.0), f64(0x1A70, 1.0)])
                 ptr_items.append(w)
@@ -551,7 +588,7 @@ def add_vintage(dev):
                 # stays dark, only the outline changes, so both skins use the plain native button)
                 items.extend(copies)
         panel.field(0x1885).value = exprs
-        print(f"  vintage: {len(VARIANTS)} lightings, mode buttons {brect}, screw {screw_rect}, "
+        print(f"  vintage: {len(VARIANTS)} lightings, mode buttons {brect}, lamp control {lamp_rect}, screw {screw_rect}, "
               f"{POINTER_STEPS} pointer steps per knob, {len(exprs)} rules")
     return hook
 
@@ -561,6 +598,7 @@ def bo_sat_test() -> Device:
         name="bo Curve",
         creator="bo",
         uuid_key="bo-devices/bo-sat-test",          # stable UUID: projects keep finding the device
+        revision=2,                                  # 2: Vintage pointers and lamp follow while bypassed; quicker loading
         nitro=with_oversampling((HERE / "bo_sat.nitro").read_text()),
         description="Saturator: Drive (clean at 0), Output, Curve (soft to hard), Asym, Tone (180 Hz pre/de-emphasis), Mix, Link",
         tags="saturation distortion clipper drive tone asymmetry",
