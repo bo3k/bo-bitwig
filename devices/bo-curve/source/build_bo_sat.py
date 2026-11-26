@@ -598,7 +598,7 @@ def bo_sat_test() -> Device:
         name="bo Curve",
         creator="bo",
         uuid_key="bo-devices/bo-sat-test",          # stable UUID: projects keep finding the device
-        revision=2,                                  # 2: Vintage pointers and lamp follow while bypassed; quicker loading
+        revision=2,                                  # version 1.1 (metadata revision_no takes whole numbers): Vintage pointers and lamp follow while bypassed; quicker loading
         nitro=with_oversampling((HERE / "bo_sat.nitro").read_text()),
         description="Saturator: Drive (clean at 0), Output, Curve (soft to hard), Asym, Tone (180 Hz pre/de-emphasis), Mix, Link",
         tags="saturation distortion clipper drive tone asymmetry",
